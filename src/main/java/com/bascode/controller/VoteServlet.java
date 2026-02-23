@@ -25,53 +25,40 @@ public class VoteServlet extends HttpServlet {
             return;
         }
 
-        String userEmail = (String) session.getAttribute("userEmail");
-        
-        /* * COORDINATION POINT: Replace placeholders below with User object from Database.
-         * User user = userService.getUserByEmail(userEmail);
-         */
-        
-        // --- PLACEHOLDERS FOR DATABASE VALUES ---
-        String userRole = "VOTER"; // Should come from user.getRole()
-        LocalDate birthDate = LocalDate.of(2005, 1, 1); // Should come from user.getBirthDate()
-        boolean hasAlreadyVoted = false; // Should come from user.getHasVoted()
-        // ----------------------------------------
-
-        // 2. ROLE CHECK: Only 'VOTER' can vote. 'ADMIN' cannot.
-        if (!"VOTER".equalsIgnoreCase(userRole)) {
-            response.sendRedirect("dashboard.jsp?error=invalid_role");
-            return;
-        }
-
-        // 3. AGE CHECK: Must be 18+ to participate in voting
-        if (birthDate == null || calculateAge(birthDate) < 18) {
-            response.sendRedirect("dashboard.jsp?error=underage");
-            return;
-        }
-
-        // 4. DUPLICATE VOTE CHECK: One Person, One Vote
-        if (hasAlreadyVoted) {
-            response.sendRedirect("dashboard.jsp?error=already_voted");
-            return;
-        }
-
-        // 5. CAPTURE CANDIDATE & RECORD VOTE
+        // 2. CAPTURE SELECTION
         String candidateId = request.getParameter("candidateId");
         if (candidateId == null || candidateId.isEmpty()) {
             response.sendRedirect("dashboard.jsp?error=no_selection");
             return;
         }
 
-        /* * FINAL INTEGRATION:
-         * votingService.processVote(userEmail, candidateId); 
-         * This method should update 'hasVoted' to true and increment candidate count.
+        /* * 3. DATABASE INTEGRATION 
+         * Pull the following from the database via your Database Lead's JPA methods
          */
-        
-        response.sendRedirect("dashboard.jsp?status=success");
-    }
+        String userRole = "CONTESTER"; // Example: A contester is voting
+        LocalDate birthDate = LocalDate.of(2000, 1, 1); 
+        boolean hasAlreadyVoted = false; 
 
-    // Helper method to calculate age precisely
-    private int calculateAge(LocalDate birthDate) {
-        return Period.between(birthDate, LocalDate.now()).getYears();
+        // 4. ROLE CHECK: Both Voters and Contesters can vote
+        if (!"VOTER".equalsIgnoreCase(userRole) && !"CONTESTER".equalsIgnoreCase(userRole)) {
+            response.sendRedirect("dashboard.jsp?error=invalid_role");
+            return;
+        }
+
+        // 5. AGE CHECK: 18+ to vote
+        if (birthDate == null || Period.between(birthDate, LocalDate.now()).getYears() < 18) {
+            response.sendRedirect("dashboard.jsp?error=underage");
+            return;
+        }
+
+        // 6. DUPLICATE VOTE CHECK: Still only ONE vote total
+        if (hasAlreadyVoted) {
+            response.sendRedirect("dashboard.jsp?error=already_voted");
+            return;
+        }
+
+        // 7. SUCCESS: Record Vote 
+        // Note: We no longer check if userId == candidateId because self-voting is allowed.
+        response.sendRedirect("dashboard.jsp?status=success");
     }
 }
