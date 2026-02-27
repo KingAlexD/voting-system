@@ -10,7 +10,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.Period;
 
-@WebServlet("/submit-vote")
+@WebServlet("/cast-vote")
 public class VoteServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
 
@@ -60,5 +60,8 @@ public class VoteServlet extends HttpServlet {
         // 7. SUCCESS: Record Vote 
         // Note: We no longer check if userId == candidateId because self-voting is allowed.
         response.sendRedirect("dashboard.jsp?status=success");
+        
+     // Frontend Lead: Redirect to a 'Success' landing page
+        response.sendRedirect(request.getContextPath() + "/vote-success.jsp");
     }
 }
