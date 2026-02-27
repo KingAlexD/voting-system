@@ -3,22 +3,40 @@
 <html>
 <head>
     <jsp:include page="/WEB-INF/views/fragment/head.jsp" />
-    <title>Online Voting System | Home</title>
+    <title>Votely | Secure Online Voting</title>
 </head>
 <body>
     <jsp:include page="/WEB-INF/views/fragment/navbar.jsp" />
 
-    <div class="container mt-5">
-        <div class="jumbotron text-center">
-            <h1>Your Voice, Your Vote</h1>
-            <p class="lead">Secure, Transparent, and Easy. Join the future of democracy today.</p>
-            <hr class="my-4">
-            <div class="d-flex justify-content-center gap-3">
-                <a class="btn btn-primary btn-lg" href="auth/register.jsp" role="button">Register to Vote</a>
-                <a class="btn btn-outline-secondary btn-lg" href="auth/login.jsp" role="button">Login</a>
+    <header class="bg-primary text-white text-center py-5">
+        <div class="container">
+            <h1 class="display-3 fw-bold">Every Vote Counts.</h1>
+            <p class="lead">A secure, transparent platform for the next generation of leadership.</p>
+            <div class="mt-4">
+                <a href="auth/register.jsp" class="btn btn-light btn-lg px-4 me-2">Get Started</a>
+                <a href="about.jsp" class="btn btn-outline-light btn-lg px-4">Learn More</a>
             </div>
         </div>
-    </div>
+    </header>
+
+    <section class="py-5">
+        <div class="container text-center">
+            <div class="row">
+                <div class="col-md-4">
+                    <h3>Secure</h3>
+                    <p>Encrypted data ensures your vote remains private and tamper-proof.</p>
+                </div>
+                <div class="col-md-4">
+                    <h3>Simple</h3>
+                    <p>Vote from any device, anywhere in the world, in just three clicks.</p>
+                </div>
+                <div class="col-md-4">
+                    <h3>Transparent</h3>
+                    <p>Real-time results you can trust, powered by modern backend logic.</p>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <jsp:include page="/WEB-INF/views/fragment/footer.jsp" />
 </body>

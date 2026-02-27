@@ -1,38 +1,39 @@
-<%@ page contentType="text/html;charset=UTF-8" %>
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <%@ include file="/WEB-INF/views/fragment/head.jsp" %>
+    <jsp:include page="/WEB-INF/views/fragment/head.jsp" />
+    <title>Register | Votely</title>
 </head>
-<body class="bg-light d-flex flex-column min-vh-100">
-    <%@ include file="/WEB-INF/views/fragment/navbar.jsp" %>
-
-    <div class="container py-5">
-        <div class="row justify-content-center">
-            <div class="col-lg-7">
-                <div class="card shadow border-0">
-                    <div class="card-body p-5">
-                        <h2 class="text-center fw-bold mb-4">Register</h2>
-                        <form action="<%=request.getContextPath()%>/register" method="POST">
-                            <div class="row g-3 mb-3">
-                                <div class="col-md-6"><input type="text" name="firstname" class="form-control" placeholder="First Name" required></div>
-                                <div class="col-md-6"><input type="text" name="lastname" class="form-control" placeholder="Last Name" required></div>
-                            </div>
-                            <div class="mb-3"><input type="email" name="email" class="form-control" placeholder="Email" required></div>
-                            <div class="row g-3 mb-3">
-                                <div class="col-md-4"><input type="number" name="birthYear" class="form-control" placeholder="Year" required></div>
-                                <div class="col-md-4"><input type="text" name="state" class="form-control" placeholder="State" required></div>
-                                <div class="col-md-4"><input type="text" name="country" class="form-control" placeholder="Country" required></div>
-                            </div>
-                            <div class="mb-4"><input type="password" name="password" class="form-control" placeholder="Password" required></div>
-                            <button type="submit" class="btn btn-primary w-100">Register Now</button>
-                        </form>
+<body>
+    <jsp:include page="/WEB-INF/views/fragment/navbar.jsp" />
+    <div class="container my-5">
+        <div class="card mx-auto" style="max-width: 500px;">
+            <div class="card-body">
+                <h3 class="text-center">Create Account</h3>
+                <form action="../../register-user" method="POST">
+                    <div class="mb-3">
+                        <label>Full Name</label>
+                        <input type="text" name="fullName" class="form-control" required>
                     </div>
-                </div>
+                    <div class="mb-3">
+                        <label>Date of Birth</label>
+                        <input type="date" name="dob" class="form-control" required>
+                        <small class="text-muted">Must be 18 or older to participate.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label>Email</label>
+                        <input type="email" name="email" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Password</label>
+                        <input type="password" name="password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Register</button>
+                </form>
             </div>
         </div>
     </div>
-
-    <%@ include file="/WEB-INF/views/fragment/footer.jsp" %>
+    <jsp:include page="/WEB-INF/views/fragment/footer.jsp" />
 </body>
 </html>
