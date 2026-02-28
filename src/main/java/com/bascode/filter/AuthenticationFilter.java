@@ -7,10 +7,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 
-//Annotations to cover all protected areas
-@WebFilter(urlPatterns = { "/dashboard.jsp", "/vote.jsp", "/apply-contester.jsp", "/submit-vote", "/register-contester",
-		"/admin/*" // Protects all admin-specific pages
-})
+@WebFilter(urlPatterns = { "/dashboard", "/vote", "/contester/*", "/profile", "/candidate-profile", "/notifications",
+        "/admin/*" })
 public class AuthenticationFilter implements Filter {
 
 	@Override
@@ -21,15 +19,12 @@ public class AuthenticationFilter implements Filter {
 		HttpServletResponse httpResponse = (HttpServletResponse) response;
 		HttpSession session = httpRequest.getSession(false);
 
-		// Check if the user session exists
-		boolean isLoggedIn = (session != null && session.getAttribute("userEmail") != null);
+		boolean isLoggedIn = (session != null && session.getAttribute("userId") != null);
 
 		if (isLoggedIn) {
-			// User is logged in, let the request proceed
 			chain.doFilter(request, response);
 		} else {
-			// Not logged in, block access and redirect to login
-			httpResponse.sendRedirect("login.jsp?error=unauthorized");
+			httpResponse.sendRedirect(httpRequest.getContextPath() + "/login-view?error=unauthorized");
 		}
 	}
 }

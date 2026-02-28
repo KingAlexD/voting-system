@@ -1,67 +1,100 @@
 package com.bascode.controller;
 
+import com.bascode.model.entity.Contester;
+import com.bascode.model.entity.User;
+import com.bascode.model.entity.Vote;
+import com.bascode.repository.ContesterRepository;
+import com.bascode.repository.NotificationRepository;
+import com.bascode.repository.UserRepository;
+import com.bascode.repository.VoteRepository;
+import com.bascode.util.AppConfigUtil;
+import com.bascode.util.ServletUtil;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.time.LocalDate;
-import java.time.Period;
 
-@WebServlet("/cast-vote")
+@WebServlet("/vote")
 public class VoteServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
+    private final UserRepository userRepository = new UserRepository();
+    private final VoteRepository voteRepository = new VoteRepository();
+    private final ContesterRepository contesterRepository = new ContesterRepository();
+    private final NotificationRepository notificationRepository = new NotificationRepository();
 
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) 
-            throws ServletException, IOException {
-        
-        // 1. SESSION VALIDATION
-        HttpSession session = request.getSession(false);
-        if (session == null || session.getAttribute("userEmail") == null) {
-            response.sendRedirect("login.jsp");
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String contesterIdParam = request.getParameter("contesterId");
+        if (contesterIdParam == null || contesterIdParam.isBlank()) {
+            response.sendRedirect(request.getContextPath() + "/dashboard?error=no_selection");
             return;
         }
 
-        // 2. CAPTURE SELECTION
-        String candidateId = request.getParameter("candidateId");
-        if (candidateId == null || candidateId.isEmpty()) {
-            response.sendRedirect("dashboard.jsp?error=no_selection");
+        Long contesterId;
+        try {
+            contesterId = Long.valueOf(contesterIdParam);
+        } catch (NumberFormatException ex) {
+            response.sendRedirect(request.getContextPath() + "/dashboard?error=invalid_contester");
             return;
         }
 
-        /* * 3. DATABASE INTEGRATION 
-         * Pull the following from the database via your Database Lead's JPA methods
-         */
-        String userRole = "CONTESTER"; // Example: A contester is voting
-        LocalDate birthDate = LocalDate.of(2000, 1, 1); 
-        boolean hasAlreadyVoted = false; 
+        EntityManagerFactory emf = ServletUtil.getEntityManagerFactory(getServletContext());
+        EntityManager em = emf.createEntityManager();
+        try {
+            if (!AppConfigUtil.isElectionOpen(getServletContext())) {
+                response.sendRedirect(request.getContextPath() + "/dashboard?error=election_not_open");
+                return;
+            }
+            LocalDate votingDeadline = AppConfigUtil.getVotingDeadline(getServletContext());
+            if (LocalDate.now().isAfter(votingDeadline)) {
+                response.sendRedirect(request.getContextPath() + "/dashboard?error=voting_closed");
+                return;
+            }
+            User currentUser = ServletUtil.getCurrentUser(request, em, userRepository);
+            if (currentUser == null) {
+                response.sendRedirect(request.getContextPath() + "/login-view?error=unauthorized");
+                return;
+            }
+            int age = LocalDate.now().getYear() - currentUser.getBirthYear();
+            if (age < 18) {
+                response.sendRedirect(request.getContextPath() + "/dashboard?error=underage");
+                return;
+            }
+            if (voteRepository.hasUserVoted(em, currentUser.getId())) {
+                response.sendRedirect(request.getContextPath() + "/dashboard?error=already_voted");
+                return;
+            }
 
-        // 4. ROLE CHECK: Both Voters and Contesters can vote
-        if (!"VOTER".equalsIgnoreCase(userRole) && !"CONTESTER".equalsIgnoreCase(userRole)) {
-            response.sendRedirect("dashboard.jsp?error=invalid_role");
-            return;
+            Contester contester = contesterRepository.findById(em, contesterId).orElse(null);
+            if (contester == null || contester.getStatus() != com.bascode.model.enums.ContesterStatus.APPROVED) {
+                response.sendRedirect(request.getContextPath() + "/dashboard?error=contester_unavailable");
+                return;
+            }
+
+            em.getTransaction().begin();
+            Vote vote = new Vote();
+            vote.setVoter(currentUser);
+            vote.setContester(contester);
+            voteRepository.save(em, vote);
+            notificationRepository.create(em, currentUser, "Vote Recorded",
+                    "Your vote for " + contester.getUser().getFirstName() + " " + contester.getUser().getLastName()
+                            + " has been recorded.",
+                    "/dashboard");
+            em.getTransaction().commit();
+            response.sendRedirect(request.getContextPath() + "/vote-success.jsp");
+        } catch (Exception ex) {
+            if (em.getTransaction().isActive()) {
+                em.getTransaction().rollback();
+            }
+            throw ex;
+        } finally {
+            em.close();
         }
-
-        // 5. AGE CHECK: 18+ to vote
-        if (birthDate == null || Period.between(birthDate, LocalDate.now()).getYears() < 18) {
-            response.sendRedirect("dashboard.jsp?error=underage");
-            return;
-        }
-
-        // 6. DUPLICATE VOTE CHECK: Still only ONE vote total
-        if (hasAlreadyVoted) {
-            response.sendRedirect("dashboard.jsp?error=already_voted");
-            return;
-        }
-
-        // 7. SUCCESS: Record Vote 
-        // Note: We no longer check if userId == candidateId because self-voting is allowed.
-        response.sendRedirect("dashboard.jsp?status=success");
-        
-     // Frontend Lead: Redirect to a 'Success' landing page
-        response.sendRedirect(request.getContextPath() + "/vote-success.jsp");
     }
 }
