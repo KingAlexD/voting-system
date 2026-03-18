@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="https://jakarta.ee/xml/ns/jakartaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+         https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
+         version="6.0">
+
+  
+    <display-name>Online Voting System</display-name>
+
+    <welcome-file-list>
+        <welcome-file>index.jsp</welcome-file>
+    </welcome-file-list>
+
+    <context-param>
+        <param-name>mail.smtp.host</param-name>
+        <param-value>smtp.gmail.com</param-value>
+    </context-param>
+    <context-param>
+        <param-name>mail.smtp.port</param-name>
+        <param-value>587</param-value>
+    </context-param>
+    <context-param>
+        <param-name>mail.smtp.username</param-name>
+        <param-value>rook6859@gmail.com</param-value>
+    </context-param>
+    <context-param>
+        <param-name>mail.smtp.password</param-name>
+        <param-value>ymcmnwrpsfmqvwzr</param-value>
+    </context-param>
+    <context-param>
+        <param-name>mail.smtp.from</param-name>
+        <param-value>rook6859@gmail.com</param-value>
+    </context-param>
+    <context-param>
+        <param-name>mail.smtp.auth</param-name>
+        <param-value>true</param-value>
+    </context-param>
+    <context-param>
+        <param-name>mail.smtp.starttls.enable</param-name>
+        <param-value>true</param-value>
+    </context-param>
+    <context-param>
+        <param-name>mail.smtp.ssl.enable</param-name>
+        <param-value>false</param-value>
+    </context-param>
+    <context-param>
+        <param-name>voting.deadline</param-name>
+        <param-value>2026-12-31</param-value>
+    </context-param>
+    <context-param>
+        <param-name>election.phase</param-name>
+        <param-value>OPEN</param-value>
+    </context-param>
+    <context-param>
+        <param-name>app.base-url</param-name>
+        <param-value>http://localhost:18080/online-voting-system</param-value>
+    </context-param>
+
+ 
+  
+    <error-page>
+        <error-code>400</error-code>
+        <location>/WEB-INF/views/error/400.jsp</location>
+    </error-page>
+
+    <!-- 401 - Unauthorized -->
+    <error-page>
+        <error-code>401</error-code>
+        <location>/WEB-INF/views/error/401.jsp</location>
+    </error-page>
+
+    <!-- 403 - Forbidden -->
+    <error-page>
+        <error-code>403</error-code>
+        <location>/WEB-INF/views/error/403.jsp</location>
+    </error-page>
+
+    <!-- 404 - Not Found -->
+    <error-page>
+        <error-code>404</error-code>
+        <location>/WEB-INF/views/error/404.jsp</location>
+    </error-page>
+
+    <!-- 500 - Internal Server Error -->
+    <error-page>
+        <error-code>500</error-code>
+        <location>/WEB-INF/views/error/500.jsp</location>
+    </error-page>
+
+    <!-- Database / Hibernate / Runtime Errors -->
+    <error-page>
+        <exception-type>java.lang.Exception</exception-type>
+        <location>/WEB-INF/views/error/database.jsp</location>
+    </error-page>
+
+</web-app>
