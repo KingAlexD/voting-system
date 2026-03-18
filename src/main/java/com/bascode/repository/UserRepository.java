@@ -34,4 +34,9 @@ public class UserRepository {
         return em.createQuery("select u from User u where u.role <> :role order by u.id desc", User.class)
                 .setParameter("role", Role.ADMIN).getResultList();
     }
+    public List<User> findAllAdmins(EntityManager em) {
+        return em.createQuery(
+            "select u from User u where u.role = com.bascode.model.enums.Role.ADMIN",
+            User.class).getResultList();
+    }
 }

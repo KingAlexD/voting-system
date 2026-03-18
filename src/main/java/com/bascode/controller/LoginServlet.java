@@ -1,5 +1,7 @@
 package com.bascode.controller;
 
+import java.io.IOException;
+
 import com.bascode.model.entity.User;
 import com.bascode.repository.UserRepository;
 import com.bascode.util.SecurityUtil;
@@ -13,7 +15,6 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import java.io.IOException;
 
 @WebServlet("/login")
 public class LoginServlet extends HttpServlet {
@@ -30,11 +31,20 @@ public class LoginServlet extends HttpServlet {
         EntityManager em = emf.createEntityManager();
         try {
             User user = userRepository.findByEmail(em, email == null ? "" : email.trim()).orElse(null);
+
             if (user == null || !SecurityUtil.verifyPassword(password, user.getPasswordHash())) {
                 response.sendRedirect(request.getContextPath() + "/login-view?error=invalid");
                 return;
             }
+
+            // Block suspended accounts before anything else
+            if (user.isSuspended()) {
+                response.sendRedirect(request.getContextPath() + "/login-view?error=suspended");
+                return;
+            }
+
             if (!user.isEmailVerified()) {
+                
                 HttpSession verificationSession = request.getSession(true);
                 verificationSession.setAttribute("verificationEmail", user.getEmail());
                 response.sendRedirect(request.getContextPath() + "/verify-view?error=not_verified");
@@ -46,6 +56,7 @@ public class LoginServlet extends HttpServlet {
             session.setAttribute("userId", user.getId());
             session.setAttribute("userEmail", user.getEmail());
             session.setAttribute("userRole", user.getRole().name());
+
             if ("ADMIN".equals(user.getRole().name())) {
                 response.sendRedirect(request.getContextPath() + "/admin/dashboard");
             } else {

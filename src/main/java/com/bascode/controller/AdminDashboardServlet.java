@@ -1,7 +1,11 @@
 package com.bascode.controller;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
+import com.bascode.model.entity.Contester;
 import com.bascode.model.entity.User;
 import com.bascode.model.enums.Role;
 import com.bascode.repository.AdminAuditLogRepository;
@@ -19,9 +23,6 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @WebServlet("/admin/dashboard")
 public class AdminDashboardServlet extends HttpServlet {
@@ -49,23 +50,28 @@ public class AdminDashboardServlet extends HttpServlet {
             Map<Long, Long> voteCounts = voteRepository.voteCountByContester(em);
             var auditLogs = auditLogRepository.findRecent(em, 500);
 
+          
+            List<Contester> positionChangeRequests = allContesters.stream()
+                    .filter(c -> c.getRequestedPosition() != null)
+                    .collect(Collectors.toList());
+
             String q = request.getParameter("q");
             String qLower = q == null ? "" : q.trim().toLowerCase();
             if (!qLower.isBlank()) {
                 allUsers = allUsers.stream()
-                        .filter(u -> (u.getFirstName() + " " + u.getLastName() + " " + u.getEmail()).toLowerCase()
-                                .contains(qLower))
+                        .filter(u -> (u.getFirstName() + " " + u.getLastName() + " " + u.getEmail())
+                                .toLowerCase().contains(qLower))
                         .collect(Collectors.toList());
                 allContesters = allContesters.stream()
                         .filter(c -> (c.getUser().getFirstName() + " " + c.getUser().getLastName() + " "
-                                + c.getUser().getEmail() + " " + c.getPosition() + " " + c.getManifesto()).toLowerCase()
-                                .contains(qLower))
+                                + c.getUser().getEmail() + " " + c.getPosition() + " " + c.getManifesto())
+                                .toLowerCase().contains(qLower))
                         .collect(Collectors.toList());
             }
 
             PageResult<User> usersPage = PaginationUtil.paginate(allUsers,
                     PaginationUtil.parsePage(request.getParameter("usersPage"), 1), 10);
-            PageResult<com.bascode.model.entity.Contester> contestersPage = PaginationUtil.paginate(allContesters,
+            PageResult<Contester> contestersPage = PaginationUtil.paginate(allContesters,
                     PaginationUtil.parsePage(request.getParameter("contestersPage"), 1), 10);
             PageResult<com.bascode.model.entity.Vote> votesPage = PaginationUtil.paginate(voteRows,
                     PaginationUtil.parsePage(request.getParameter("votesPage"), 1), 10);
@@ -73,13 +79,12 @@ public class AdminDashboardServlet extends HttpServlet {
                     PaginationUtil.parsePage(request.getParameter("auditPage"), 1), 10);
 
             long totalVotes = 0L;
-            for (Long count : voteCounts.values()) {
-                totalVotes += count;
-            }
+            for (Long count : voteCounts.values()) totalVotes += count;
 
             request.setAttribute("q", q == null ? "" : q);
             request.setAttribute("allUsers", usersPage.getItems());
             request.setAttribute("pendingContesters", pending);
+            request.setAttribute("positionChangeRequests", positionChangeRequests);
             request.setAttribute("allContesters", contestersPage.getItems());
             request.setAttribute("voteRows", votesPage.getItems());
             request.setAttribute("voteCounts", voteCounts);
@@ -96,6 +101,7 @@ public class AdminDashboardServlet extends HttpServlet {
             request.setAttribute("votesTotalPages", votesPage.getTotalPages());
             request.setAttribute("auditPage", auditPage.getPage());
             request.setAttribute("auditTotalPages", auditPage.getTotalPages());
+
             request.getRequestDispatcher("/WEB-INF/views/admin/admin-dashboard.jsp").forward(request, response);
         } finally {
             em.close();

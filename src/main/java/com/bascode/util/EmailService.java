@@ -49,8 +49,9 @@ public final class EmailService {
         props.put("mail.smtp.host", host);
         props.put("mail.smtp.port", port);
         props.put("mail.smtp.auth", auth);
-        props.put("mail.smtp.starttls.enable", starttls);
-        props.put("mail.smtp.ssl.enable", ssl);
+        props.put("mail.smtp.starttls.enable", "true"); 
+        props.put("mail.smtp.ssl.trust", "*");          
+        props.put("mail.smtp.ssl.checkserveridentity", "false"); 
 
         Session mailSession = Session.getInstance(props, new Authenticator() {
             @Override
@@ -58,7 +59,14 @@ public final class EmailService {
                 return new PasswordAuthentication(username, password);
             }
         });
-
+        
+        System.out.println("SMTP HOST: " + host);
+        System.out.println("SMTP PORT: " + port);
+        System.out.println("SMTP USERNAME: " + username);
+        System.out.println("SMTP PASSWORD LENGTH: " + (password == null ? "null" : password.length()));
+        System.out.println("SMTP FROM: " + from);
+        
+        
         Message message = new MimeMessage(mailSession);
         message.setFrom(new InternetAddress(from));
         message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail));

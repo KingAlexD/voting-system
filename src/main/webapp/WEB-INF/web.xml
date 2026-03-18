@@ -5,15 +5,13 @@
          https://jakarta.ee/xml/ns/jakartaee/web-app_6_0.xsd"
          version="6.0">
 
-    <!-- App Name -->
+  
     <display-name>Online Voting System</display-name>
 
-    <!-- Welcome Page -->
     <welcome-file-list>
         <welcome-file>index.jsp</welcome-file>
     </welcome-file-list>
 
-    <!-- SMTP configuration for verification emails -->
     <context-param>
         <param-name>mail.smtp.host</param-name>
         <param-value>smtp.gmail.com</param-value>
@@ -24,15 +22,15 @@
     </context-param>
     <context-param>
         <param-name>mail.smtp.username</param-name>
-        <param-value>CHANGE_ME_OR_USE_MAIL_SMTP_USERNAME_ENV</param-value>
+        <param-value>rook6859@gmail.com</param-value>
     </context-param>
     <context-param>
         <param-name>mail.smtp.password</param-name>
-        <param-value>CHANGE_ME_OR_USE_MAIL_SMTP_PASSWORD_ENV</param-value>
+        <param-value>ymcmnwrpsfmqvwzr</param-value>
     </context-param>
     <context-param>
         <param-name>mail.smtp.from</param-name>
-        <param-value>CHANGE_ME_OR_USE_MAIL_SMTP_FROM_ENV</param-value>
+        <param-value>rook6859@gmail.com</param-value>
     </context-param>
     <context-param>
         <param-name>mail.smtp.auth</param-name>
@@ -60,10 +58,7 @@
     </context-param>
 
  
-    <!-- GLOBAL ERROR HANDLING -->
- 
-
-    <!-- 400 - Bad Request -->
+  
     <error-page>
         <error-code>400</error-code>
         <location>/WEB-INF/views/error/400.jsp</location>

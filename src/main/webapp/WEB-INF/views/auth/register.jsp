@@ -1,74 +1,108 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <jsp:include page="/WEB-INF/views/fragment/head.jsp" />
-    <title>Register | Online Voting System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register | VoCho</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,700;1,900&family=Syne:wght@700;800&family=Epilogue:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/css/register.css">
 </head>
 <body>
-    <jsp:include page="/WEB-INF/views/fragment/navbar.jsp" />
-    <div class="container my-5">
-        <div class="card mx-auto shadow-sm" style="max-width: 700px;">
-            <div class="card-body p-4 p-md-5">
-                <h3 class="mb-4">Voter Registration</h3>
-
-                <c:if test="${not empty param.error}">
-                    <div class="alert alert-danger">
-                        <c:choose>
-                            <c:when test="${param.error == 'missing_fields'}">All fields are required.</c:when>
-                            <c:when test="${param.error == 'password_mismatch'}">Passwords do not match.</c:when>
-                            <c:when test="${param.error == 'invalid_birth_year'}">Birth year is invalid.</c:when>
-                            <c:when test="${param.error == 'email_exists'}">Email already exists.</c:when>
-                            <c:otherwise>Registration failed.</c:otherwise>
-                        </c:choose>
-                    </div>
-                </c:if>
-
-                <form action="${pageContext.request.contextPath}/register" method="POST" class="row g-3">
-                    <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
-                    <div class="col-md-6">
-                        <label class="form-label">First Name</label>
-                        <input type="text" name="firstName" class="form-control" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Last Name</label>
-                        <input type="text" name="lastName" class="form-control" required>
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label">Email</label>
-                        <input type="email" name="email" class="form-control" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Password</label>
-                        <input type="password" name="password" class="form-control" minlength="8" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Confirm Password</label>
-                        <input type="password" name="confirmPassword" class="form-control" minlength="8" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Birth Year</label>
-                        <input type="number" name="birthYear" class="form-control" min="1900" max="2099" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">State</label>
-                        <input type="text" name="state" class="form-control" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Country</label>
-                        <input type="text" name="country" class="form-control" required>
-                    </div>
-                    <div class="col-12 d-grid mt-4">
-                        <button type="submit" class="btn btn-success btn-lg">Create Account</button>
-                    </div>
-                    <div class="col-12">
-                        <small class="text-muted">Users below 18 can register and login, but cannot vote or contest until age 18+.</small>
-                    </div>
-                </form>
-            </div>
+  <jsp:include page="/WEB-INF/views/fragment/navbar.jsp"/>
+  
+  <div class= "all">
+    <div class="auth-panel-image">
+        <div class="bg-img"></div>
+        <div class="overlay"></div>
+        <div class="grain"></div>
+        <div class="ornament"></div>
+        <div class="panel-content">
+            <h2>Own your<br><em>voice.</em><br>Make your<br><em>choice.</em></h2>
+            <p>Join VoCho and become part of a platform where every vote is heard, every opinion matters, and every choice counts.</p>
         </div>
     </div>
-    <jsp:include page="/WEB-INF/views/fragment/footer.jsp" />
+
+    <div class="auth-panel-form">
+        <div class="brand">
+            <span class="brand-name"><span class="bm">V</span><span class="bt">OCHO</span></span>
+        </div>
+
+        <p class="form-eyebrow">Get started</p>
+        <h1 class="form-heading">Create account</h1>
+        <p class="form-subheading">Register to make your voice heard on VoCho.</p>
+
+        <c:if test="${not empty error}">
+            <div class="alert alert-danger">${error}</div>
+        </c:if>
+        <c:if test="${param.status == 'email_sent'}">
+            <div class="alert alert-success">Verification email sent. Check your inbox.</div>
+        </c:if>
+
+        <form action="${pageContext.request.contextPath}/register" method="POST">
+            <input type="hidden" name="_csrf"
+                   value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
+
+            <div class="field-row">
+                <div class="field">
+                    <label for="firstName">First Name</label>
+                    <input type="text" id="firstName" name="firstName"
+                           placeholder="Name" autocomplete="given-name" required>
+                </div>
+                <div class="field">
+                    <label for="lastName">Last Name</label>
+                    <input type="text" id="lastName" name="lastName"
+                           placeholder="Surname" autocomplete="family-name" required>
+                </div>
+            </div>
+
+            <div class="field">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email"
+                       placeholder="you@example.com" autocomplete="email" required>
+            </div>
+
+            <div class="field-row">
+                <div class="field">
+                    <label for="birthYear">Birth Year</label>
+                    <input type="number" id="birthYear" name="birthYear"
+                           placeholder="Must be 18+" min="1900" max="2010" required>
+                </div>
+                <div class="field">
+                    <label for="state">State</label>
+                    <input type="text" id="state" name="state"
+                           autocomplete="address-level1" required>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="field-row">
+                <div class="field">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password"
+                           placeholder="Min. 8 chars" autocomplete="new-password" required>
+                    <span class="hint">At least 8 characters</span>
+                </div>
+                <div class="field">
+                    <label for="confirmPassword">Confirm</label>
+                    <input type="password" id="confirmPassword" name="confirmPassword"
+                           autocomplete="new-password" required>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit"><span>Create Account</span></button>
+        </form>
+
+        <div class="form-links">
+            <span></span>
+            <span>Already registered? <a href="${pageContext.request.contextPath}/login-view">Sign in</a></span>
+        </div>
+    </div>
+    </div>
+    
 </body>
 </html>

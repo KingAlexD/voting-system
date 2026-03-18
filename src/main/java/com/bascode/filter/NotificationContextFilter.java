@@ -2,40 +2,52 @@ package com.bascode.filter;
 
 import java.io.IOException;
 
+import com.bascode.repository.ContactMessageRepository;
 import com.bascode.repository.NotificationRepository;
+import com.bascode.model.enums.Role;
 import com.bascode.util.ServletUtil;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
-import jakarta.servlet.Filter;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
+import jakarta.servlet.*;
 import jakarta.servlet.annotation.WebFilter;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.*;
 
 @WebFilter(urlPatterns = "/*")
 public class NotificationContextFilter implements Filter {
     private final NotificationRepository notificationRepository = new NotificationRepository();
+    private final ContactMessageRepository contactMessageRepository = new ContactMessageRepository();
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
         HttpServletRequest httpRequest = (HttpServletRequest) request;
         HttpSession session = httpRequest.getSession(false);
+
         Long userId = null;
-        if (session != null && session.getAttribute("userId") instanceof Long id) {
-            userId = id;
+        String userRole = null;
+        if (session != null) {
+            if (session.getAttribute("userId") instanceof Long id) userId = id;
+            if (session.getAttribute("userRole") instanceof String r) userRole = r;
         }
+
         if (userId != null) {
             EntityManagerFactory emf = ServletUtil.getEntityManagerFactory(httpRequest.getServletContext());
             if (emf != null) {
                 EntityManager em = emf.createEntityManager();
                 try {
-                    long unreadCount = notificationRepository.countUnread(em, userId);
-                    httpRequest.setAttribute("unreadNotificationCount", unreadCount);
+                    long unreadNotifs = notificationRepository.countUnread(em, userId);
+                    httpRequest.setAttribute("unreadNotificationCount", unreadNotifs);
+
+                    if ("ADMIN".equals(userRole)) {
+                        // Admin sees count of unread user messages
+                        long unreadMsgs = contactMessageRepository.countUnreadForAdmin(em);
+                        httpRequest.setAttribute("unreadMessageCount", unreadMsgs);
+                    } else {
+                        // User sees count of unread admin replies
+                        long unreadMsgs = contactMessageRepository.countUnreadForUser(em, userId);
+                        httpRequest.setAttribute("unreadMessageCount", unreadMsgs);
+                    }
                 } finally {
                     em.close();
                 }
