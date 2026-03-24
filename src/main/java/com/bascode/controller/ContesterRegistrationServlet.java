@@ -81,6 +81,7 @@ public class ContesterRegistrationServlet extends HttpServlet {
                 response.sendRedirect(request.getContextPath() + "/dashboard?error=position_full");
                 return;
             }
+            
 
             em.getTransaction().begin();
             Contester contester = new Contester();

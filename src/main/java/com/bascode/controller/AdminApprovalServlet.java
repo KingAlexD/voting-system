@@ -77,7 +77,7 @@ public class AdminApprovalServlet extends HttpServlet {
                 if (action.equals("suspend")) {
                     target.setSuspended(true);
                     userRepository.update(em, target);
-                    adminAuditLogRepository.save(em, currentUser, "USER_SUSPENDED",
+                    adminAuditLogRepository.log(em, currentUser, "USER_SUSPENDED",
                             "User #" + target.getId() + " (" + target.getEmail() + ") suspended.");
                     notificationRepository.create(em, target, "Account Suspended",
                             "Your account has been suspended by an administrator. Contact support if you believe this is an error.",
@@ -86,7 +86,7 @@ public class AdminApprovalServlet extends HttpServlet {
                 } else if (action.equals("unsuspend")) {
                     target.setSuspended(false);
                     userRepository.update(em, target);
-                    adminAuditLogRepository.save(em, currentUser, "USER_UNSUSPENDED",
+                    adminAuditLogRepository.log(em, currentUser, "USER_UNSUSPENDED",
                             "User #" + target.getId() + " (" + target.getEmail() + ") unsuspended.");
                     notificationRepository.create(em, target, "Account Restored",
                             "Your account suspension has been lifted. You can now log in.", "/login-view");
@@ -101,7 +101,7 @@ public class AdminApprovalServlet extends HttpServlet {
                     }
                     target.setRole(Role.CONTESTER);
                     userRepository.update(em, target);
-                    adminAuditLogRepository.save(em, currentUser, "USER_PROMOTED_TO_CONTESTER",
+                    adminAuditLogRepository.log(em, currentUser, "USER_PROMOTED_TO_CONTESTER",
                             "User #" + target.getId() + " promoted to CONTESTER.");
                     notificationRepository.create(em, target, "Role Updated: Contester",
                             "An administrator has promoted your role to Contester.", "/dashboard");
@@ -115,7 +115,7 @@ public class AdminApprovalServlet extends HttpServlet {
                     }
                     target.setRole(Role.VOTER);
                     userRepository.update(em, target);
-                    adminAuditLogRepository.save(em, currentUser, "USER_DEMOTED_TO_VOTER",
+                    adminAuditLogRepository.log(em, currentUser, "USER_DEMOTED_TO_VOTER",
                             "User #" + target.getId() + " demoted to VOTER.");
                     notificationRepository.create(em, target, "Role Updated: Voter",
                             "An administrator has changed your role back to Voter.", "/dashboard");
@@ -152,7 +152,7 @@ public class AdminApprovalServlet extends HttpServlet {
                 long approvedCount = contesterRepository.countApprovedByPosition(em, contester.getPosition());
                 if (approvedCount >= 3) {
                     contester.setStatus(ContesterStatus.DENIED);
-                    adminAuditLogRepository.save(em, currentUser, "CONTESTER_DENIED_AUTO_CAP",
+                    adminAuditLogRepository.log(em, currentUser, "CONTESTER_DENIED_AUTO_CAP",
                             "Contester #" + contester.getId() + " denied; position " + contester.getPosition() + " is full.");
                     notificationRepository.create(em, contester.getUser(), "Application Denied",
                             "Your contester application was denied because the position already has 3 approved candidates.",
@@ -161,7 +161,7 @@ public class AdminApprovalServlet extends HttpServlet {
                     contester.setStatus(ContesterStatus.APPROVED);
                     contester.getUser().setRole(Role.CONTESTER);
                     userRepository.update(em, contester.getUser());
-                    adminAuditLogRepository.save(em, currentUser, "CONTESTER_APPROVED",
+                    adminAuditLogRepository.log(em, currentUser, "CONTESTER_APPROVED",
                             "Contester #" + contester.getId() + " approved for " + contester.getPosition() + ".");
                     notificationRepository.create(em, contester.getUser(), "Application Approved",
                             "Congratulations! Your contester application for " + contester.getPosition() + " has been approved.",
@@ -170,7 +170,7 @@ public class AdminApprovalServlet extends HttpServlet {
 
             } else if ("deny".equalsIgnoreCase(action)) {
                 contester.setStatus(ContesterStatus.DENIED);
-                adminAuditLogRepository.save(em, currentUser, "CONTESTER_DENIED",
+                adminAuditLogRepository.log(em, currentUser, "CONTESTER_DENIED",
                         "Contester #" + contester.getId() + " denied by admin.");
                 notificationRepository.create(em, contester.getUser(), "Application Denied",
                         "Your contester application has been denied by an administrator.", "/dashboard");
@@ -185,7 +185,7 @@ public class AdminApprovalServlet extends HttpServlet {
                 long approvedCount = contesterRepository.countApprovedByPosition(em, requested);
                 if (approvedCount >= 3) {
                     contester.setRequestedPosition(null);
-                    adminAuditLogRepository.save(em, currentUser, "POSITION_CHANGE_DENIED_CAP",
+                    adminAuditLogRepository.log(em, currentUser, "POSITION_CHANGE_DENIED_CAP",
                             "Position change for Contester #" + contester.getId() + " denied; " + requested + " is full.");
                     notificationRepository.create(em, contester.getUser(), "Position Change Denied",
                             "Your request to move to " + requested + " was denied because that position is already full.",
@@ -193,7 +193,7 @@ public class AdminApprovalServlet extends HttpServlet {
                 } else {
                     contester.setPosition(requested);
                     contester.setRequestedPosition(null);
-                    adminAuditLogRepository.save(em, currentUser, "POSITION_CHANGE_APPROVED",
+                    adminAuditLogRepository.log(em, currentUser, "POSITION_CHANGE_APPROVED",
                             "Contester #" + contester.getId() + " moved to " + requested + ".");
                     notificationRepository.create(em, contester.getUser(), "Position Change Approved",
                             "Your position has been updated to " + requested + ".", "/dashboard");
@@ -202,7 +202,7 @@ public class AdminApprovalServlet extends HttpServlet {
             } else if ("deny-position".equalsIgnoreCase(action)) {
                 Position requested = contester.getRequestedPosition();
                 contester.setRequestedPosition(null);
-                adminAuditLogRepository.save(em, currentUser, "POSITION_CHANGE_DENIED",
+                adminAuditLogRepository.log(em, currentUser, "POSITION_CHANGE_DENIED",
                         "Position change request for Contester #" + contester.getId() + " denied by admin.");
                 notificationRepository.create(em, contester.getUser(), "Position Change Denied",
                         "Your request to change position to " + (requested != null ? requested : "unknown") + " was denied.",

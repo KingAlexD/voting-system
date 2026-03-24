@@ -9,7 +9,7 @@ import jakarta.persistence.EntityManager;
 
 public class AdminAuditLogRepository {
 
-    public void save(EntityManager em, User adminUser, String actionType, String actionDetail) {
+    public void log(EntityManager em, User adminUser, String actionType, String actionDetail) {
         AdminAuditLog log = new AdminAuditLog();
         log.setAdminUser(adminUser);
         log.setActionType(actionType);

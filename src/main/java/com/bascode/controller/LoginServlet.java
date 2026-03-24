@@ -21,6 +21,15 @@ public class LoginServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private final UserRepository userRepository = new UserRepository();
 
+    // Show login form
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        request.getRequestDispatcher("/WEB-INF/views/auth/login.jsp")
+               .forward(request, response);
+    }
+
+    // Handle login submission
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -33,18 +42,16 @@ public class LoginServlet extends HttpServlet {
             User user = userRepository.findByEmail(em, email == null ? "" : email.trim()).orElse(null);
 
             if (user == null || !SecurityUtil.verifyPassword(password, user.getPasswordHash())) {
-                response.sendRedirect(request.getContextPath() + "/login-view?error=invalid");
+                response.sendRedirect(request.getContextPath() + "/login?error=invalid");
                 return;
             }
 
-            // Block suspended accounts before anything else
             if (user.isSuspended()) {
-                response.sendRedirect(request.getContextPath() + "/login-view?error=suspended");
+                response.sendRedirect(request.getContextPath() + "/login?error=suspended");
                 return;
             }
 
             if (!user.isEmailVerified()) {
-                
                 HttpSession verificationSession = request.getSession(true);
                 verificationSession.setAttribute("verificationEmail", user.getEmail());
                 response.sendRedirect(request.getContextPath() + "/verify-view?error=not_verified");

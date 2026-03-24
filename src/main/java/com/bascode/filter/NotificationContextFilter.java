@@ -40,11 +40,11 @@ public class NotificationContextFilter implements Filter {
                     httpRequest.setAttribute("unreadNotificationCount", unreadNotifs);
 
                     if ("ADMIN".equals(userRole)) {
-                        // Admin sees count of unread user messages
+            
                         long unreadMsgs = contactMessageRepository.countUnreadForAdmin(em);
                         httpRequest.setAttribute("unreadMessageCount", unreadMsgs);
                     } else {
-                        // User sees count of unread admin replies
+                        
                         long unreadMsgs = contactMessageRepository.countUnreadForUser(em, userId);
                         httpRequest.setAttribute("unreadMessageCount", unreadMsgs);
                     }

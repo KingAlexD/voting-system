@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.bascode.model.entity.Vote;
+import com.bascode.model.enums.Position;
 
 import jakarta.persistence.EntityManager;
 
@@ -52,5 +53,13 @@ public class VoteRepository {
               .setParameter("cid", contesterId)
                 .executeUpdate();
     }
+    public Map<Position, Boolean> userVotesByPosition(EntityManager em, Long userId) {
+        List<Vote> votes = em.createQuery(
+            "select v from Vote v join v.contester c where v.voter.id = :uid", Vote.class
+        ).setParameter("uid", userId).getResultList();
 
+        return votes.stream().collect(
+            Collectors.toMap(v -> v.getContester().getPosition(), v -> true)
+        );
+    }
 }

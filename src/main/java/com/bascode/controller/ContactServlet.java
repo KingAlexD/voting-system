@@ -38,7 +38,7 @@ public class ContactServlet extends HttpServlet {
                 request.setAttribute("myMessages", myMessages);
             }
             request.setAttribute("currentUser", currentUser);
-            request.getRequestDispatcher("/WEB-INF/views/auth/contact.jsp").forward(request, response);
+            request.getRequestDispatcher("/contact.jsp").forward(request, response);
         } finally {
             em.close();
         }
@@ -89,7 +89,8 @@ public class ContactServlet extends HttpServlet {
             }
             em.getTransaction().commit();
 
-            response.sendRedirect(request.getContextPath() + "/contact?status=sent");
+            request.getSession().setAttribute("success", "Message sent successfully.");
+            response.sendRedirect(request.getContextPath() + "/contact");
         } catch (Exception ex) {
             if (em.getTransaction().isActive()) em.getTransaction().rollback();
             throw ex;
@@ -102,8 +103,7 @@ public class ContactServlet extends HttpServlet {
     @Override
     protected void doPut(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        // Not standard for forms — handled via separate MarkMessageReadServlet
-    }
+        }
 
     private boolean isBlank(String v) { return v == null || v.isBlank(); }
 }

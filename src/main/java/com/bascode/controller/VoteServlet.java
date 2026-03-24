@@ -87,7 +87,8 @@ public class VoteServlet extends HttpServlet {
                             + " has been recorded.",
                     "/dashboard");
             em.getTransaction().commit();
-            response.sendRedirect(request.getContextPath() + "/vote-success.jsp");
+            request.getSession().setAttribute("success", "Vote recorded successfully. No take-backs 😈");
+            response.sendRedirect(request.getContextPath() + "/dashboard");
         } catch (Exception ex) {
             if (em.getTransaction().isActive()) {
                 em.getTransaction().rollback();
