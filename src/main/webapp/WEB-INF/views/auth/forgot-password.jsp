@@ -1,37 +1,57 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <jsp:include page="/WEB-INF/views/fragment/head.jsp" />
-    <title>Forgot Password | Online Voting System</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forgot Password | VoCho</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,700;1,900&family=Syne:wght@700;800&family=Epilogue:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/css/auth-pages.css">
 </head>
 <body>
     <jsp:include page="/WEB-INF/views/fragment/navbar.jsp" />
-    <div class="container my-5">
-        <div class="card mx-auto shadow-sm" style="max-width: 500px;">
-            <div class="card-body p-4">
-                <h3 class="text-center mb-3">Forgot Password</h3>
-                <p class="text-muted text-center">Enter your email to receive a reset link.</p>
 
-                <c:if test="${param.status == 'request_sent'}">
-                    <div class="alert alert-success">If the email exists, a reset link has been sent.</div>
-                </c:if>
-                <c:if test="${param.error == 'email_send_failed'}">
-                    <div class="alert alert-danger">Unable to send reset email currently. Try again later.</div>
-                </c:if>
+    <div class="auth-page">
+        <div class="auth-card">
 
-                <form action="${pageContext.request.contextPath}/forgot-password" method="post">
-                    <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
-                    <div class="mb-3">
-                        <label class="form-label">Email Address</label>
-                        <input type="email" class="form-control" name="email" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Send Reset Link</button>
-                </form>
+            <div class="brand">
+                <span class="brand-name"><span class="bm">V</span><span class="bt">OCHO</span></span>
+            </div>
+
+            <p class="form-eyebrow">Account Recovery</p>
+            <h1 class="form-heading">Forgot<br>Password</h1>
+            <p class="form-subheading">Enter your email address and we'll send you a reset link.</p>
+
+            <c:if test="${param.status == 'request_sent'}">
+                <div class="alert alert-success">If that email is registered, a reset link has been sent. Check your inbox.</div>
+            </c:if>
+            <c:if test="${param.error == 'email_send_failed'}">
+                <div class="alert alert-danger">Unable to send reset email right now. Please try again later.</div>
+            </c:if>
+
+            <form action="${pageContext.request.contextPath}/forgot-password" method="POST">
+                <input type="hidden" name="_csrf"
+                       value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
+
+                <div class="field">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email"
+                           placeholder="you@example.com" autocomplete="email" required>
+                </div>
+
+                <button type="submit" class="btn-submit"><span>Send Reset Link</span></button>
+            </form>
+
+            <div class="form-links">
+                <a href="${pageContext.request.contextPath}/login-view">&#8592; Back to Sign In</a>
+                <a href="${pageContext.request.contextPath}/register-view">Create account</a>
             </div>
         </div>
     </div>
+
     <jsp:include page="/WEB-INF/views/fragment/footer.jsp" />
 </body>
 </html>

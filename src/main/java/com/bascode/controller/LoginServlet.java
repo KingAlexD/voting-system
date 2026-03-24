@@ -1,5 +1,7 @@
 package com.bascode.controller;
 
+import java.io.IOException;
+
 import com.bascode.model.entity.User;
 import com.bascode.repository.UserRepository;
 import com.bascode.util.SecurityUtil;
@@ -13,13 +15,21 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import java.io.IOException;
 
 @WebServlet("/login")
 public class LoginServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private final UserRepository userRepository = new UserRepository();
 
+    // Show login form
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        request.getRequestDispatcher("/WEB-INF/views/auth/login.jsp")
+               .forward(request, response);
+    }
+
+    // Handle login submission
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -30,10 +40,17 @@ public class LoginServlet extends HttpServlet {
         EntityManager em = emf.createEntityManager();
         try {
             User user = userRepository.findByEmail(em, email == null ? "" : email.trim()).orElse(null);
+
             if (user == null || !SecurityUtil.verifyPassword(password, user.getPasswordHash())) {
-                response.sendRedirect(request.getContextPath() + "/login-view?error=invalid");
+                response.sendRedirect(request.getContextPath() + "/login?error=invalid");
                 return;
             }
+
+            if (user.isSuspended()) {
+                response.sendRedirect(request.getContextPath() + "/login?error=suspended");
+                return;
+            }
+
             if (!user.isEmailVerified()) {
                 HttpSession verificationSession = request.getSession(true);
                 verificationSession.setAttribute("verificationEmail", user.getEmail());
@@ -46,6 +63,7 @@ public class LoginServlet extends HttpServlet {
             session.setAttribute("userId", user.getId());
             session.setAttribute("userEmail", user.getEmail());
             session.setAttribute("userRole", user.getRole().name());
+
             if ("ADMIN".equals(user.getRole().name())) {
                 response.sendRedirect(request.getContextPath() + "/admin/dashboard");
             } else {

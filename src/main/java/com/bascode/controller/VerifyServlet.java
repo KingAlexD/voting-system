@@ -47,11 +47,14 @@ public class VerifyServlet extends HttpServlet {
             user.setVerificationCode(null);
             userRepository.update(em, user);
             notificationRepository.create(em, user, "Account Verified",
-                    "Your account has been successfully verified. You can now access your dashboard.", "/dashboard");
+                    "Your account has been successfully verified. You can now log in.", "/dashboard");
             em.getTransaction().commit();
 
+           
             session.removeAttribute("verificationEmail");
-            session.removeAttribute("lastVerificationCode");
+            session.invalidate(); 
+
+          
             response.sendRedirect(request.getContextPath() + "/login-view?status=verified");
         } catch (Exception ex) {
             if (em.getTransaction().isActive()) {

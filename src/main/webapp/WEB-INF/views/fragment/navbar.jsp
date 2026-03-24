@@ -1,48 +1,89 @@
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
-  <div class="container">
-    <a class="navbar-brand fw-bold" href="${pageContext.request.contextPath}/index.jsp">
-        <i class="bi bi-check2-square me-2"></i>VoteSystem
+
+<nav class="nav" id="voNav">
+  <div class="navinner">
+
+    <c:if test="${not empty sessionScope.success}">
+      <div class="vo-alert success" style="position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:500;min-width:300px;text-align:center;">
+        ${sessionScope.success}
+      </div>
+      <c:remove var="success" scope="session"/>
+    </c:if>
+    <c:if test="${not empty sessionScope.error}">
+      <div class="vo-alert error" style="position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:500;min-width:300px;text-align:center;">
+        ${sessionScope.error}
+      </div>
+      <c:remove var="error" scope="session"/>
+    </c:if>
+
+    <a class="navbrand" href="${pageContext.request.contextPath}/index.jsp">
+      <span class="navlogo">V</span><span class="navlogo-text">o<span class="navlogo">C</span>ho</span>
     </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-      <span class="navbar-toggler-icon"></span>
+
+    <button class="navtoggle" id="navToggle" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
     </button>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto align-items-center">
-        <li class="nav-item"><a class="nav-link" href="${pageContext.request.contextPath}/index.jsp">Home</a></li>
-        <li class="nav-item"><a class="nav-link" href="${pageContext.request.contextPath}/about.jsp">About</a></li>
-        <li class="nav-item"><a class="nav-link" href="${pageContext.request.contextPath}/contact.jsp">Contact</a></li>
-        <c:choose>
-            <c:when test="${not empty sessionScope.userId}">
-                <c:if test="${sessionScope.userRole == 'ADMIN'}">
-                    <li class="nav-item"><a class="nav-link" href="${pageContext.request.contextPath}/admin/dashboard">Admin</a></li>
-                </c:if>
-                <c:if test="${sessionScope.userRole != 'ADMIN'}">
-                    <li class="nav-item"><a class="nav-link" href="${pageContext.request.contextPath}/dashboard">Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link" href="${pageContext.request.contextPath}/profile">Profile</a></li>
-                </c:if>
-                <li class="nav-item">
-                    <a class="nav-link" href="${pageContext.request.contextPath}/notifications">
-                        <i class="bi bi-bell"></i>
-                        <c:if test="${not empty unreadNotificationCount and unreadNotificationCount > 0}">
-                            <span class="badge rounded-pill text-bg-danger">${unreadNotificationCount}</span>
-                        </c:if>
-                    </a>
-                </li>
-                <li class="nav-item ms-lg-2">
-                    <a class="btn btn-outline-light btn-sm px-3" href="${pageContext.request.contextPath}/logout">Logout</a>
-                </li>
-            </c:when>
-            <c:otherwise>
-                <li class="nav-item ms-lg-3">
-                    <a class="nav-link" href="${pageContext.request.contextPath}/login-view">Login</a>
-                </li>
-                <li class="nav-item ms-lg-2">
-                    <a class="btn btn-primary btn-sm px-3" href="${pageContext.request.contextPath}/register-view">Register</a>
-                </li>
-            </c:otherwise>
-        </c:choose>
-      </ul>
+
+    <div class="navlinks" id="navLinks">
+      <a class="navlink" href="${pageContext.request.contextPath}/index.jsp">Home</a>
+      <a class="navlink" href="${pageContext.request.contextPath}/about.jsp">About</a>
+
+   <c:choose>
+    <c:when test="${not empty sessionScope.userId}">
+
+        <c:if test="${sessionScope.userRole == 'ADMIN'}">
+            <a class="navlink" href="${pageContext.request.contextPath}/admin/contact">Messages</a>
+        </c:if>
+
+        <c:if test="${sessionScope.userRole != 'ADMIN'}">
+            <a class="navlink" href="${pageContext.request.contextPath}/contact">Messages</a>
+        </c:if>
+
+        <c:if test="${sessionScope.userRole == 'ADMIN'}">
+            <a class="navlink" href="${pageContext.request.contextPath}/admin/dashboard">Admin</a>
+        </c:if>
+
+        <c:if test="${sessionScope.userRole != 'ADMIN'}">
+            <a class="navlink" href="${pageContext.request.contextPath}/dashboard">Dashboard</a>
+            <a class="navlink" href="${pageContext.request.contextPath}/profile">Profile</a>
+        </c:if>
+
+        <a class="navbell navlink" href="${pageContext.request.contextPath}/notifications">
+            <svg width="17" height="17" ...> ... </svg>
+            <c:if test="${not empty unreadNotificationCount and unreadNotificationCount > 0}">
+                <span class="navbadge">${unreadNotificationCount}</span>
+            </c:if>
+        </a>
+
+        <a class="navpill navpill--ghost" href="${pageContext.request.contextPath}/logout">Log out</a>
+
+    </c:when>
+
+    <c:otherwise>
+        <a class="navlink" href="${pageContext.request.contextPath}/contact.jsp">Contact</a>
+        <a class="navlink" href="${pageContext.request.contextPath}/login">Login</a>
+        <a class="navpill" href="${pageContext.request.contextPath}/register">Register</a>
+    </c:otherwise>
+
+</c:choose>
     </div>
+
   </div>
 </nav>
+
+<script>
+(function(){
+  var toggle = document.getElementById('navToggle');
+  var links  = document.getElementById('navLinks');
+  if (toggle) toggle.addEventListener('click', function(){
+    links.classList.toggle('open');
+    toggle.classList.toggle('open');
+  });
+  // Auto-hide session flash messages after 4s
+  var flash = document.querySelectorAll('.vo-alert[style*="fixed"]');
+  flash.forEach(function(el) {
+    setTimeout(function() { el.style.opacity='0'; el.style.transition='opacity .5s'; setTimeout(function(){el.remove();},500); }, 4000);
+  });
+})();
+</script>

@@ -1,6 +1,8 @@
 package com.bascode.controller;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.util.Map;
 import java.util.Optional;
 
 import com.bascode.model.entity.Contester;
@@ -18,8 +20,6 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.time.LocalDate;
-import java.util.Map;
 
 @WebServlet("/dashboard")
 public class DashboardServlet extends HttpServlet {
@@ -41,23 +41,34 @@ public class DashboardServlet extends HttpServlet {
 
             request.setAttribute("currentUser", currentUser);
             request.setAttribute("approvedContesters", contesterRepository.findApproved(em));
+
             Map<Long, Long> voteCounts = voteRepository.voteCountByContester(em);
             request.setAttribute("voteCounts", voteCounts);
-            request.setAttribute("hasVoted", voteRepository.hasUserVoted(em, currentUser.getId()));
+
+            boolean hasVoted = voteRepository.hasUserVoted(em, currentUser.getId());
+            request.setAttribute("hasVoted", hasVoted);
+
+           
+            if (hasVoted) {
+                request.setAttribute("myVote", voteRepository.findByVoterId(em, currentUser.getId()).orElse(null));
+            }
+
             int age = LocalDate.now().getYear() - currentUser.getBirthYear();
             request.setAttribute("isAdult", age >= 18);
+
             LocalDate deadline = AppConfigUtil.getVotingDeadline(getServletContext());
             request.setAttribute("votingDeadline", deadline);
             request.setAttribute("votingClosed", LocalDate.now().isAfter(deadline));
             request.setAttribute("electionPhase", AppConfigUtil.getElectionPhase(getServletContext()).name());
+
             long totalVotes = 0L;
-            for (Long count : voteCounts.values()) {
-                totalVotes += count;
-            }
+            for (Long count : voteCounts.values()) totalVotes += count;
             request.setAttribute("totalVotes", totalVotes);
+
             Optional<Contester> application = contesterRepository.findByUserId(em, currentUser.getId());
             request.setAttribute("myContesterApplication", application.orElse(null));
             request.setAttribute("positions", com.bascode.model.enums.Position.values());
+
             request.getRequestDispatcher("/WEB-INF/views/voter/dashboard.jsp").forward(request, response);
         } finally {
             em.close();

@@ -27,6 +27,7 @@ public class ResendVerificationServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         HttpSession session = request.getSession(false);
         String verificationEmail = session == null ? null : (String) session.getAttribute("verificationEmail");
+
         if (verificationEmail == null) {
             response.sendRedirect(request.getContextPath() + "/verify-view?error=session_expired");
             return;
@@ -49,11 +50,11 @@ public class ResendVerificationServlet extends HttpServlet {
 
             try {
                 EmailService.sendVerificationCode(getServletContext(), user.getEmail(), code);
-                session.setAttribute("lastVerificationCode", code);
+                // Do NOT store the code in session — it must only travel via email
                 response.sendRedirect(request.getContextPath() + "/verify-view?status=resent");
             } catch (MessagingException ex) {
                 getServletContext().log("Unable to resend verification email to " + user.getEmail(), ex);
-                session.setAttribute("lastVerificationCode", code);
+                // Do NOT expose the code as a session fallback
                 response.sendRedirect(request.getContextPath() + "/verify-view?error=email_send_failed");
             }
         } catch (Exception ex) {

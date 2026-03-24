@@ -3,68 +3,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <jsp:include page="/WEB-INF/views/fragment/head.jsp" />
-    <title>Verify Account</title>
-    <style>
-        .code-input {
-            letter-spacing: 0.6rem;
-            font-size: 1.8rem;
-            text-align: center;
-            font-weight: 700;
-        }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Account | VoCho</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,700;1,900&family=Syne:wght@700;800&family=Epilogue:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="${pageContext.request.contextPath}/css/auth-pages.css">
 </head>
-<body class="bg-light d-flex flex-column min-vh-100">
+<body>
     <jsp:include page="/WEB-INF/views/fragment/navbar.jsp" />
-    <div class="container py-5 flex-grow-1 d-flex align-items-center">
-        <div class="row justify-content-center w-100">
-            <div class="col-md-6 col-lg-5">
-                <div class="card shadow border-0 text-center">
-                    <div class="card-body p-5">
-                        <h3 class="fw-bold">Verify Identity</h3>
-                        <p class="text-muted mb-4">Enter the 6-digit code sent to your email address.</p>
 
-                        <c:if test="${param.status == 'code_sent'}">
-                            <div class="alert alert-info">Verification code sent. Check your inbox and spam folder.</div>
-                        </c:if>
-                        <c:if test="${param.status == 'resent'}">
-                            <div class="alert alert-info">A new verification code has been sent.</div>
-                        </c:if>
-                        <c:if test="${not empty sessionScope.lastVerificationCode}">
-                            <div class="alert alert-warning text-start">
-                                <strong>Verification code:</strong>
-                                <code>${sessionScope.lastVerificationCode}</code>
-                            </div>
-                        </c:if>
-                        <c:if test="${not empty param.error}">
-                            <div class="alert alert-danger">
-                                <c:choose>
-                                    <c:when test="${param.error == 'invalid_code'}">Invalid verification code.</c:when>
-                                    <c:when test="${param.error == 'session_expired'}">Verification session expired. Register again.</c:when>
-                                    <c:when test="${param.error == 'email_send_failed'}">Could not send email. Contact admin or retry.</c:when>
-                                    <c:otherwise>Verification failed.</c:otherwise>
-                                </c:choose>
-                            </div>
-                        </c:if>
+    <div class="auth-page">
+        <div class="auth-card" style="text-align: center;">
 
-                        <form action="${pageContext.request.contextPath}/verify" method="POST">
-                            <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
-                            <div class="mb-4">
-                                <input type="text" name="code" class="form-control code-input"
-                                       placeholder="000000" maxlength="6" pattern="[0-9]{6}" required>
-                            </div>
-                            <button type="submit" class="btn btn-success w-100 py-2 fw-bold">VERIFY ACCOUNT</button>
-                        </form>
+            <!-- Envelope icon -->
+            <div class="verify-icon">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                </svg>
+            </div>
 
-                        <form action="${pageContext.request.contextPath}/resend-verification" method="POST" class="mt-3">
-                            <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
-                            <button type="submit" class="btn btn-link text-decoration-none">Resend Code</button>
-                        </form>
-                    </div>
+            <p class="form-eyebrow">Email Verification</p>
+            <h1 class="form-heading">Verify<br>Identity</h1>
+            <p class="form-subheading">Enter the 6-digit code sent to your email address. Check your inbox and spam folder.</p>
+
+            <c:if test="${param.status == 'code_sent'}">
+                <div class="alert alert-info">Verification code sent. Check your inbox and spam folder.</div>
+            </c:if>
+            <c:if test="${param.status == 'resent'}">
+                <div class="alert alert-info">A new verification code has been sent to your email.</div>
+            </c:if>
+            <c:if test="${not empty sessionScope.lastVerificationCode}">
+                <div class="alert alert-warning" style="text-align:left;">
+                    <strong style="font-family:'Syne',sans-serif;font-size:0.65rem;letter-spacing:.1em;">DEV — CODE:</strong>
+                    <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.1rem;font-weight:900;color:#d4a843;letter-spacing:.12em;">
+                        ${sessionScope.lastVerificationCode}
+                    </span>
                 </div>
+            </c:if>
+            <c:if test="${not empty param.error}">
+                <div class="alert alert-danger">
+                    <c:choose>
+                        <c:when test="${param.error == 'invalid_code'}">Invalid verification code. Please try again.</c:when>
+                        <c:when test="${param.error == 'session_expired'}">Verification session expired. Please register again.</c:when>
+                        <c:when test="${param.error == 'email_send_failed'}">Could not send email. Contact support or retry.</c:when>
+                        <c:otherwise>Verification failed. Please try again.</c:otherwise>
+                    </c:choose>
+                </div>
+            </c:if>
+
+            <form action="${pageContext.request.contextPath}/verify" method="POST">
+                <input type="hidden" name="_csrf"
+                       value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
+                <div class="field" style="margin-bottom:20px;">
+                    <input type="text" name="code" class="code-input"
+                           placeholder="000000" maxlength="6" pattern="[0-9]{6}"
+                           inputmode="numeric" autocomplete="one-time-code" required>
+                </div>
+                <button type="submit" class="btn-submit"><span>Verify Account</span></button>
+            </form>
+
+            <form action="${pageContext.request.contextPath}/resend-verification" method="POST" style="margin-top:14px;">
+                <input type="hidden" name="_csrf"
+                       value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
+                <button type="submit" class="btn-ghost">Resend Code</button>
+            </form>
+
+            <div class="form-links" style="margin-top:14px; justify-content:center;">
+                <a href="${pageContext.request.contextPath}/register-view">&#8592; Back to Register</a>
             </div>
         </div>
     </div>
+
     <jsp:include page="/WEB-INF/views/fragment/footer.jsp" />
 </body>
 </html>
