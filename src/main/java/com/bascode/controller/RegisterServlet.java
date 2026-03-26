@@ -44,8 +44,7 @@ public class RegisterServlet extends HttpServlet {
         String confirmPassword = request.getParameter("confirmPassword");
         String birthYearParam  = request.getParameter("birthYear");
         String state           = request.getParameter("state");
-        // 'country' is NOT a field in register.jsp — do NOT check it
-
+        String country = request.getParameter("country");
         // ── Presence checks ───────────────────────────────────────────────────
         if (isBlank(firstName)) {
             fail(request, response, "First name is required."); return;
@@ -59,6 +58,10 @@ public class RegisterServlet extends HttpServlet {
         if (isBlank(birthYearParam)) {
             fail(request, response, "Birth year is required."); return;
         }
+        if (isBlank(country)) {
+            fail(request, response, "Country is required."); 
+            return;
+        }
         if (isBlank(state)) {
             fail(request, response, "State is required."); return;
         }
@@ -69,7 +72,6 @@ public class RegisterServlet extends HttpServlet {
             fail(request, response, "Please confirm your password."); return;
         }
 
-        // ── Password rules ────────────────────────────────────────────────────
         if (password.length() < 8) {
             fail(request, response, "Password must be at least 8 characters."); return;
         }
@@ -111,6 +113,7 @@ public class RegisterServlet extends HttpServlet {
             user.setEmail(email.trim().toLowerCase());
             user.setPasswordHash(SecurityUtil.hashPassword(password));
             user.setBirthYear(birthYear);
+            user.setCountry(country);
             user.setState(state.trim());
             user.setRole(Role.VOTER);
             user.setEmailVerified(false);
@@ -118,11 +121,10 @@ public class RegisterServlet extends HttpServlet {
             userRepository.save(em, user);
             em.getTransaction().commit();
 
-            // Store for the verify page
             HttpSession session = request.getSession(true);
             session.setAttribute("verificationEmail", user.getEmail());
 
-            // Send verification email
+        
             try {
                 EmailService.sendVerificationCode(
                         getServletContext(), user.getEmail(), user.getVerificationCode());

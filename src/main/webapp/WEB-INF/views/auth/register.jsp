@@ -71,11 +71,31 @@
                     <input type="number" id="birthYear" name="birthYear"
                            placeholder="Must be 18+" min="1900" max="2010" required>
                 </div>
-                <div class="field">
-                    <label for="state">State</label>
-                    <input type="text" id="state" name="state"
-                           autocomplete="address-level1" required>
-                </div>
+                <div class="field-row">
+    <div class="field">
+        <label for="country">Country</label>
+        <select id="country" name="country" required>
+            <option value="Nigeria" selected>Nigeria</option>
+            <option value="Ghana">Ghana</option>
+            <option value="Kenya">Kenya</option>
+            <option value="South Africa">South Africa</option>
+            <option value="Egypt">Egypt</option>
+            <option value="United States">United States</option>
+            <option value="United Kingdom">United Kingdom</option>
+            <option value="Canada">Canada</option>
+            <option value="Brazil">Brazil</option>
+            <option value="India">India</option>
+        </select>
+    </div>
+
+    <div class="field">
+        <label for="state">State</label>
+        <select id="state" name="state" required>
+     
+        </select>
+    </div>
+</div>
+             
             </div>
 
             <div class="divider"></div>
@@ -103,6 +123,45 @@
         </div>
     </div>
     </div>
+    
+    <script>
+const countryStates = {
+    "Nigeria": ["Lagos",
+        "Abia","Adamawa","Akwa Ibom","Anambra","Bauchi","Bayelsa","Benue","Borno",
+        "Cross River","Delta","Ebonyi","Edo","Ekiti","Enugu","Gombe","Imo","Jigawa",
+        "Kaduna","Kano","Katsina","Kebbi","Kogi","Kwara","Lagos","Nasarawa","Niger",
+        "Ogun","Ondo","Osun","Oyo","Plateau","Rivers","Sokoto","Taraba","Yobe","Zamfara","FCT"
+    ],
+    "Ghana": ["Ashanti","Central","Eastern","Greater Accra","Northern","Volta","Western"],
+    "Kenya": ["Nairobi","Mombasa","Kisumu","Nakuru","Uasin Gishu"],
+    "South Africa": ["Gauteng","KwaZulu-Natal","Western Cape","Eastern Cape"],
+    "Egypt": ["Cairo","Alexandria","Giza","Luxor"],
+    "United States": ["California","Texas","New York","Florida"],
+    "United Kingdom": ["England","Scotland","Wales","Northern Ireland"],
+    "Canada": ["Ontario","Quebec","British Columbia","Alberta"],
+    "Brazil": ["Acre","Bahia","Ceará","São Paulo"],
+    "India": ["Delhi","Maharashtra","Tamil Nadu","Karnataka"]
+};
+
+const countrySelect = document.getElementById("country");
+const stateSelect = document.getElementById("state");
+
+function populateStates() {
+    const states = countryStates[countrySelect.value] || [];
+    stateSelect.innerHTML = "";
+
+    states.forEach(state => {
+        const option = document.createElement("option");
+        option.value = state;
+        option.textContent = state;
+        stateSelect.appendChild(option);
+    });
+}
+
+populateStates();
+
+countrySelect.addEventListener("change", populateStates);
+</script>
     
 </body>
 </html>

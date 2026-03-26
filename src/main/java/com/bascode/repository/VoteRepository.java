@@ -23,6 +23,7 @@ public class VoteRepository {
                 .getSingleResult();
         return count > 0;
     }
+
     public Optional<Vote> findByVoterId(EntityManager em, Long userId) {
         return em.createQuery(
                 "select v from Vote v join fetch v.contester c join fetch c.user where v.voter.id = :userId",
@@ -61,5 +62,30 @@ public class VoteRepository {
         return votes.stream().collect(
             Collectors.toMap(v -> v.getContester().getPosition(), v -> true)
         );
+    
     }
+
+    public boolean hasUserVotedForPosition(EntityManager em, Long userId, Position position) {
+        Long count = em.createQuery(
+                "select count(v.id) from Vote v where v.voter.id = :userId and v.contester.position = :position", 
+                Long.class)
+                .setParameter("userId", userId)
+                .setParameter("position", position)
+                .getSingleResult();
+        return count > 0;
+    }
+
+    public Optional<Vote> findByVoterIdAndPosition(EntityManager em, Long userId, Position position) {
+        return em.createQuery(
+                "select v from Vote v join fetch v.contester c join fetch c.user " +
+                "where v.voter.id = :userId and c.position = :position",
+                Vote.class)
+                .setParameter("userId", userId)
+                .setParameter("position", position)
+                .getResultList()
+                .stream()
+                .findFirst();
+    }
+
+
 }

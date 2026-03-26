@@ -64,40 +64,58 @@
     </div>
 
     <%-- ── ELECTION CONTROLS ──────────────────────────────────────────── --%>
-    <div class="election-ctrl">
-      <div class="election-ctrl__title">
-        &#9889; Election Controls
-        <span id="phaseBadge" class="election-ctrl__phase phase-draft">Loading…</span>
+   <%-- ── ELECTION CONTROLS ──────────────────────────────────────────── --%>
+<div class="election-ctrl">
+  <div class="election-ctrl__title">
+    &#9889; Election Controls
+    <span id="phaseBadge" class="election-ctrl__phase phase-draft">Loading…</span>
+  </div>
+  
+  <div id="electionStatusMsg" style="display:none; margin-bottom:16px;"></div>
+  
+  <div class="election-ctrl__row">
+    <!-- START ELECTION -->
+    <form id="startForm" action="${pageContext.request.contextPath}/admin/election/control" method="POST" style="display:contents;">
+      <input type="hidden" name="_csrf" value="${csrfToken}">
+      <input type="hidden" name="action" value="start">
+      <div class="dur-field">
+        <label>Duration (1–1440 min)</label>
+        <input type="number" name="durationMinutes" min="1" max="1440" placeholder="Unlimited if blank" 
+               style="width:140px;">
       </div>
-      <div class="election-ctrl__row">
-        <form action="${pageContext.request.contextPath}/admin/election/control" method="POST" style="display:contents;">
-          <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
-          <input type="hidden" name="action" value="start">
-          <div class="dur-field">
-            <label>Duration (1–1440 min)</label>
-            <input type="number" name="durationMinutes" min="1" max="1440" placeholder="Unlimited if blank">
-          </div>
-          <button type="submit" class="vo-btn vo-btn--gold">&#9654;&nbsp; Start Election</button>
-        </form>
-        <form action="${pageContext.request.contextPath}/admin/election/control" method="POST">
-          <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
-          <input type="hidden" name="action" id="pauseAction" value="pause">
-          <button type="submit" class="vo-btn vo-btn--ghost" id="btnPause">&#9646;&#9646;&nbsp; Pause</button>
-        </form>
-        <form action="${pageContext.request.contextPath}/admin/election/control" method="POST"
-              onsubmit="return confirm('Stop the election and declare a winner? This cannot be undone.')">
-          <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
-          <input type="hidden" name="action" value="stop">
-          <button type="submit" class="vo-btn vo-btn--danger-ghost">&#9632;&nbsp; Stop &amp; Declare</button>
-        </form>
-      </div>
-      <div id="timerDisplay"></div>
-      <p class="ctrl-hint">
-        Requires <strong>&#8805; 2 approved contesters per position</strong> to start.&nbsp;
-        Once a position has <strong>3 approved</strong>, it is closed to further applications.&nbsp;
-        Timer range: 1 min – 24 hrs. When it expires, a winner popup appears site-wide on every page.
-      </p>
-    </div>
+      <button type="submit" class="vo-btn vo-btn--gold" id="btnStart">
+        &#9654; Start Election
+      </button>
+    </form>
+
+    <!-- PAUSE/RESUME -->
+    <form id="pauseForm" action="${pageContext.request.contextPath}/admin/election/control" method="POST" style="display:contents;">
+      <input type="hidden" name="_csrf" value="${csrfToken}">
+      <input type="hidden" name="action" id="pauseAction" value="pause">
+      <button type="submit" class="vo-btn vo-btn--ghost" id="btnPause">
+        &#9646;&#9646; Pause
+      </button>
+    </form>
+
+    <!-- STOP & DECLARE -->
+    <form id="stopForm" action="${pageContext.request.contextPath}/admin/election/control" method="POST" style="display:contents;">
+      <input type="hidden" name="_csrf" value="${csrfToken}">
+      <input type="hidden" name="action" value="stop">
+      <button type="submit" class="vo-btn vo-btn--danger-ghost" id="btnStop"
+              onclick="return confirm('🛑 Stop election and declare winner?\n\nThis is PERMANENT and cannot be undone.\nAll voting stops immediately.');">
+        &#9632; Stop & Declare
+      </button>
+    </form>
+  </div>
+  
+  <div id="timerDisplay" style="margin-top:12px;"></div>
+  
+  <p class="ctrl-hint">
+    <strong>Status:</strong> Requires ⩾2 approved contesters per position to start.<br>
+    <strong>Position Limit:</strong> Max 3 approved per position.<br>
+    <strong>Timer:</strong> 1min–24hrs or unlimited. Auto-declares winner when expired.
+  </p>
+</div>
 
     <%-- Search + exports --%>
     <div class="vo-card" style="margin-bottom:24px;">

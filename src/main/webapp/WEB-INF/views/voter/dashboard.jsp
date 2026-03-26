@@ -1,5 +1,6 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+<%@ taglib prefix="fn" uri="jakarta.tags.functions" %>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -75,7 +76,7 @@
 </c:if>
 
 <c:if test="${electionPhase == 'OPEN'}">
-   ... show vote buttons ...
+   
 </c:if>
     <div class="stat-row">
       <div class="stat-tile"><div class="stat-tile__label">Eligibility</div><div class="stat-tile__value ${isAdult ? 'gold' : ''}">${isAdult ? '18+ OK' : 'Under 18'}</div></div>
@@ -100,7 +101,7 @@
         <%-- Voting card — vote confirmation goes through JS modal --%>
         <div class="vo-card">
           <div class="vo-card__head">
-            <span class="vo-card__title">Cast Your Vote</span>
+            <span class="vo-card__title">Contester details</span>
             <span class="vo-badge ${hasVoted ? 'vo-badge--green' : (electionPhase == 'OPEN' && !votingClosed && isAdult ? 'vo-badge--gold' : 'vo-badge--coral')}">
               ${hasVoted ? 'Voted' : (electionPhase == 'OPEN' && !votingClosed && isAdult ? 'Open' : 'Locked')}
             </span>
@@ -111,10 +112,10 @@
             </c:if>
             <c:if test="${not empty approvedContesters}">
               <%-- Hidden form — JS submits it after confirmation --%>
-              <form id="voteForm" action="${pageContext.request.contextPath}/vote" method="post">
-                <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
-                <input type="hidden" name="contesterId" id="voteContesterId">
-              </form>
+             <form id="voteForm" action="${pageContext.request.contextPath}/vote" method="post">
+  <input type="hidden" name="_csrf" value="${csrfToken}">
+  <input type="hidden" name="contesterId" id="voteContesterId">
+</form>
 
               <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px;">
                 <c:forEach items="${approvedContesters}" var="c">
@@ -155,6 +156,105 @@
 
       <%-- Right column — Profile + My Vote + Apply --%>
       <div>
+              <div class="vo-card">
+          <div class="vo-card__head"><span class="vo-card__title">Contester Application</span></div>
+          <div class="vo-card__body">
+            <c:choose>
+              <c:when test="${not empty myContesterApplication}">
+                <div class="apply-card" style="padding:0;background:transparent;border:none;">
+                  <div class="apply-card__status apply-card__status--${myContesterApplication.status == 'APPROVED' ? 'approved' : (myContesterApplication.status == 'PENDING' ? 'pending' : 'denied')}">
+                    ${myContesterApplication.status}
+                  </div>
+                  <div class="apply-card__pos">${myContesterApplication.position}</div>
+                  <p class="apply-card__manifesto">${myContesterApplication.manifesto}</p>
+                </div>
+
+                <%-- Position change for approved --%>
+                <c:if test="${myContesterApplication.status == 'APPROVED'}">
+                  <c:choose>
+                    <c:when test="${not empty myContesterApplication.requestedPosition}">
+                      <div class="vo-alert vo-alert--info" style="margin-bottom:14px;">
+                        Position change to <strong>${myContesterApplication.requestedPosition}</strong> pending approval.
+                      </div>
+                    </c:when>
+                    <c:otherwise>
+                      <div class="vo-divider" data-label="REQUEST POSITION CHANGE"></div>
+                      <form action="${pageContext.request.contextPath}/contester/request-position-change" method="post" style="margin-bottom:12px;">
+                        <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
+                        <div class="field-group">
+                          <select name="requestedPosition" class="vo-select" required>
+                            <option value="">Select new position</option>
+                            <c:forEach items="${positions}" var="pos">
+                              <c:if test="${pos != myContesterApplication.position}">
+                                <option value="${pos}">${pos}</option>
+                              </c:if>
+                            </c:forEach>
+                          </select>
+                        </div>
+                        <button type="submit" class="vo-btn vo-btn--ghost vo-btn--sm" style="width:100%;justify-content:center;">
+                          Request Position Change
+                        </button>
+                      </form>
+                    </c:otherwise>
+                  </c:choose>
+
+                  <div class="vo-divider" data-label="WITHDRAW"></div>
+                  <p style="font-size:.78rem;font-weight:300;color:rgba(234,228,214,.4);margin-bottom:10px;line-height:1.6;">
+                    Withdrawing removes your contester role and resets your vote count permanently.
+                  </p>
+                  <form action="${pageContext.request.contextPath}/contester/withdraw" method="post">
+                    <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
+                    <input type="hidden" name="action" value="withdraw">
+                    <button type="submit" class="vo-btn vo-btn--danger-ghost vo-btn--sm" style="width:100%;justify-content:center;"
+                            onclick="return confirm('Withdraw from the election? This resets your vote count and returns you to Voter status.')">
+                      Withdraw from Election
+                    </button>
+                  </form>
+                </c:if>
+
+                <%-- Cancel pending --%>
+                <c:if test="${myContesterApplication.status == 'PENDING'}">
+                  <div class="vo-divider"></div>
+                  <form action="${pageContext.request.contextPath}/contester/withdraw" method="post">
+                    <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
+                    <input type="hidden" name="action" value="withdraw">
+                    <button type="submit" class="vo-btn vo-btn--ghost vo-btn--sm" style="width:100%;justify-content:center;"
+                            onclick="return confirm('Cancel your pending application?')">
+                      Cancel Application
+                    </button>
+                  </form>
+                </c:if>
+              </c:when>
+
+              <c:otherwise>
+                <form action="${pageContext.request.contextPath}/contester/apply" method="post">
+                  <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
+                  <div class="field-group">
+                    <label class="vo-label">Position</label>
+                    <select name="position" class="vo-select" required
+                            ${votingClosed || !isAdult || electionPhase != 'OPEN' ? 'disabled' : ''}>
+                      <option value="">Select position</option>
+                      <c:forEach items="${positions}" var="pos">
+                        <option value="${pos}">${pos}</option>
+                      </c:forEach>
+                    </select>
+                  </div>
+                  <div class="field-group">
+                    <label class="vo-label">Manifesto</label>
+                    <textarea name="manifesto" class="vo-textarea" rows="4"
+                              minlength="20" maxlength="2000"
+                              placeholder="Share your core agenda..."
+                              ${votingClosed || !isAdult || electionPhase != 'OPEN' ? 'disabled' : ''}></textarea>
+                  </div>
+                  <button type="submit" class="vo-btn vo-btn--coral" style="width:100%;justify-content:center;"
+                          ${votingClosed || !isAdult || electionPhase != 'OPEN' ? 'disabled' : ''}>
+                    Apply as Contester
+                  </button>
+                </form>
+              </c:otherwise>
+            </c:choose>
+          </div>
+        </div>
         <div class="vo-card">
           <div class="vo-card__head"><span class="vo-card__title">Profile</span></div>
           <div class="vo-card__body">
@@ -177,80 +277,81 @@
         </c:if>
 
         <div class="vo-card">
-          <div class="vo-card__head"><span class="vo-card__title">Contester Application</span></div>
-          <div class="vo-card__body">
-            <c:choose>
-              <c:when test="${not empty myContesterApplication}">
-                <div class="apply-card" style="padding:0;background:transparent;border:none;">
-                  <div class="apply-card__status apply-card__status--${myContesterApplication.status == 'APPROVED' ? 'approved' : (myContesterApplication.status == 'PENDING' ? 'pending' : 'denied')}">${myContesterApplication.status}</div>
-                  <div class="apply-card__pos">${myContesterApplication.position}</div>
-                  <p class="apply-card__manifesto">${myContesterApplication.manifesto}</p>
-                </div>
+          <div class="vo-card__head"><span class="vo-card__title">Cast your vote</span></div>
+    <div class="vo-card__body">
+  <c:if test="${empty approvedContesters}">
+    <p style="color:rgba(234,228,214,.4);font-size:.85rem;">No approved contesters yet.</p>
+  </c:if>
+  <c:if test="${not empty approvedContesters}">
+    <%-- Hidden form — JS submits it after confirmation --%>
+    <form id="voteForm" action="${pageContext.request.contextPath}/vote" method="post">
+      <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
+      <input type="hidden" name="contesterId" id="voteContesterId">
+    </form>
 
-                <c:if test="${myContesterApplication.status == 'APPROVED'}">
+    <%-- **POSITION-GROUPED CANDIDATES** --%>
+    <c:forEach items="${positions}" var="position">
+      <c:set var="positionContesters" value="${contestersByPosition[position]}" />
+      <c:if test="${not empty positionContesters}">
+        <div style="margin-bottom:28px;">
+          <div style="font-family:'Syne',sans-serif;font-size:.65rem;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:rgba(212,168,67,.6);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(212,168,67,.12);">
+            ${position}
+          </div>
+          
+          <c:forEach items="${positionContesters}" var="c">
+            <c:set var="hasVotedThisPos" value="${userVotesByPosition[position] == true}" />
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;background:#1a2f55;border:1px solid rgba(212,168,67,.12);border-radius:4px;transition:border-color .15s;margin-bottom:8px;"
+                 onmouseover="this.style.borderColor='rgba(212,168,67,.3)'"
+                 onmouseout="this.style.borderColor='rgba(212,168,67,.12)'">
+              <div style="flex:1;">
+                <span style="font-family:'Barlow Condensed',sans-serif;font-size:1.05rem;font-weight:900;text-transform:uppercase;color:#eae4d6;letter-spacing:-.01em;">
+                  ${c.user.firstName} ${c.user.lastName}
+                </span>
+                <span class="vo-badge vo-badge--cream" style="margin-left:8px;">${c.position}</span>
+                <p style="font-size:.78rem;font-weight:300;color:rgba(234,228,214,.42);margin-top:4px;margin-bottom:0;line-height:1.5;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${c.manifesto}</p>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+                <button type="button" class="vo-btn vo-btn--ghost vo-btn--sm"
+                        onclick="openCandidateModal('${c.user.firstName} ${c.user.lastName}','${c.position}','${fn:escapeXml(c.manifesto)}')">
+                  Details
+                </button>
+                <c:if test="${electionPhase == 'OPEN' && !votingClosed && isAdult}">
                   <c:choose>
-                    <c:when test="${not empty myContesterApplication.requestedPosition}">
-                      <div class="vo-alert vo-alert--info" style="margin-bottom:14px;">Position change to <strong>${myContesterApplication.requestedPosition}</strong> pending.</div>
+                    <c:when test="${hasVotedThisPos}">
+                      <span class="vo-badge vo-badge--green" style="padding:8px 16px;font-weight:600;font-size:.8rem;">Voted ✓</span>
                     </c:when>
                     <c:otherwise>
-                      <div class="vo-divider" data-label="REQUEST POSITION CHANGE"></div>
-                      <form action="${pageContext.request.contextPath}/contester/request-position-change" method="post" style="margin-bottom:12px;">
-                        <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
-                        <div class="field-group">
-                          <select name="requestedPosition" class="vo-select" required>
-                            <option value="">Select new position</option>
-                            <c:forEach items="${positions}" var="pos">
-                              <c:if test="${pos != myContesterApplication.position}"><option value="${pos}">${pos}</option></c:if>
-                            </c:forEach>
-                          </select>
-                        </div>
-                        <button type="submit" class="vo-btn vo-btn--ghost vo-btn--sm" style="width:100%;justify-content:center;">Request Change</button>
-                      </form>
+                      <button type="button" class="vo-btn vo-btn--gold vo-btn--sm"
+                              onclick="openVoteConfirm('${c.id}','${c.user.firstName} ${c.user.lastName}','${c.position}')">
+                        Vote
+                      </button>
                     </c:otherwise>
                   </c:choose>
-                  <div class="vo-divider" data-label="WITHDRAW"></div>
-                  <p style="font-size:.78rem;font-weight:300;color:rgba(234,228,214,.4);margin-bottom:10px;line-height:1.6;">Withdrawing removes your contester role permanently.</p>
-                  <form action="${pageContext.request.contextPath}/contester/withdraw" method="post">
-                    <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
-                    <input type="hidden" name="action" value="withdraw">
-                    <button type="submit" class="vo-btn vo-btn--danger-ghost vo-btn--sm" style="width:100%;justify-content:center;"
-                            onclick="return confirm('Withdraw from the election? Resets your vote count.')">Withdraw</button>
-                  </form>
                 </c:if>
+              </div>
+            </div>
+          </c:forEach>
+        </div>
+      </c:if>
+    </c:forEach>
 
-                <c:if test="${myContesterApplication.status == 'PENDING'}">
-                  <div class="vo-divider"></div>
-                  <form action="${pageContext.request.contextPath}/contester/withdraw" method="post">
-                    <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
-                    <input type="hidden" name="action" value="withdraw">
-                    <button type="submit" class="vo-btn vo-btn--ghost vo-btn--sm" style="width:100%;justify-content:center;"
-                            onclick="return confirm('Cancel your pending application?')">Cancel Application</button>
-                  </form>
-                </c:if>
-              </c:when>
-
-              <c:otherwise>
-                <form action="${pageContext.request.contextPath}/contester/apply" method="post">
-                  <input type="hidden" name="_csrf" value="<%= com.bascode.util.CsrfUtil.getToken(request.getSession(true)) %>">
-                  <div class="field-group">
-                    <label class="vo-label">Position</label>
-                    <select name="position" class="vo-select" required ${votingClosed || !isAdult || electionPhase != 'OPEN' ? 'disabled' : ''}>
-                      <option value="">Select position</option>
-                      <c:forEach items="${positions}" var="pos"><option value="${pos}">${pos}</option></c:forEach>
-                    </select>
-                  </div>
-                  <div class="field-group">
-                    <label class="vo-label">Manifesto</label>
-                    <textarea name="manifesto" class="vo-textarea" rows="4" minlength="20" maxlength="2000"
-                              placeholder="Share your core agenda…"
-                              ${votingClosed || !isAdult || electionPhase != 'OPEN' ? 'disabled' : ''}></textarea>
-                  </div>
-                  <button type="submit" class="vo-btn vo-btn--coral" style="width:100%;justify-content:center;"
-                          ${votingClosed || !isAdult || electionPhase != 'OPEN' ? 'disabled' : ''}>Apply as Contester</button>
-                </form>
-              </c:otherwise>
-            </c:choose>
-          </div>
+    <%-- Status messages --%>
+    <c:if test="${hasVoted}">
+      <p style="text-align:center;font-size:.75rem;color:#6de08a;font-family:'Syne',sans-serif;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-top:20px;">
+        &#10003; Vote${fn:length(userVotes) > 1 ? 's' : ''} recorded
+      </p>
+    </c:if>
+    <c:if test="${!isAdult}">
+      <p style="text-align:center;font-size:.75rem;color:#f08080;font-family:'Syne',sans-serif;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">Unlocks at age 18</p>
+    </c:if>
+    <c:if test="${votingClosed}">
+      <p style="text-align:center;font-size:.75rem;color:#f08080;font-family:'Syne',sans-serif;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">Voting has closed</p>
+    </c:if>
+    <c:if test="${electionPhase != 'OPEN'}">
+      <p style="text-align:center;font-size:.75rem;color:#f08080;font-family:'Syne',sans-serif;font-weight:800;letter-spacing:.08em;text-transform:uppercase;">Phase: ${electionPhase}</p>
+    </c:if>
+  </c:if>
+</div>
         </div>
 
       </div>
