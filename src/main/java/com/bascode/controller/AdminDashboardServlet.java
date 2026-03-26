@@ -1,17 +1,21 @@
 package com.bascode.controller;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.bascode.model.entity.Contester;
 import com.bascode.model.entity.User;
+import com.bascode.model.enums.Position;
 import com.bascode.model.enums.Role;
 import com.bascode.repository.AdminAuditLogRepository;
 import com.bascode.repository.ContesterRepository;
 import com.bascode.repository.UserRepository;
 import com.bascode.repository.VoteRepository;
+import com.bascode.util.AppConfigUtil;
+import com.bascode.util.CsrfUtil;
 import com.bascode.util.PageResult;
 import com.bascode.util.PaginationUtil;
 import com.bascode.util.ServletUtil;
@@ -33,7 +37,9 @@ public class AdminDashboardServlet extends HttpServlet {
     private final AdminAuditLogRepository auditLogRepository = new AdminAuditLogRepository();
 
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+
         EntityManagerFactory emf = ServletUtil.getEntityManagerFactory(getServletContext());
         EntityManager em = emf.createEntityManager();
         try {
@@ -50,7 +56,6 @@ public class AdminDashboardServlet extends HttpServlet {
             Map<Long, Long> voteCounts = voteRepository.voteCountByContester(em);
             var auditLogs = auditLogRepository.findRecent(em, 500);
 
-          
             List<Contester> positionChangeRequests = allContesters.stream()
                     .filter(c -> c.getRequestedPosition() != null)
                     .collect(Collectors.toList());
@@ -78,9 +83,15 @@ public class AdminDashboardServlet extends HttpServlet {
             PageResult<com.bascode.model.entity.AdminAuditLog> auditPage = PaginationUtil.paginate(auditLogs,
                     PaginationUtil.parsePage(request.getParameter("auditPage"), 1), 10);
 
-            
             long totalVotes = 0L;
             for (Long count : voteCounts.values()) totalVotes += count;
+
+            // ── Per-position approved count for the readiness indicator ──────────
+            Map<String, Long> positionReadiness = new HashMap<>();
+            for (Position pos : Position.values()) {
+                positionReadiness.put(pos.name(),
+                        contesterRepository.countApprovedByPosition(em, pos));
+            }
 
             request.setAttribute("q", q == null ? "" : q);
             request.setAttribute("allUsers", usersPage.getItems());
@@ -102,11 +113,21 @@ public class AdminDashboardServlet extends HttpServlet {
             request.setAttribute("votesTotalPages", votesPage.getTotalPages());
             request.setAttribute("auditPage", auditPage.getPage());
             request.setAttribute("auditTotalPages", auditPage.getTotalPages());
-         // Add this line BEFORE the forward (around line 120):
-            request.setAttribute("csrfToken", com.bascode.util.CsrfUtil.getToken(request.getSession(true)));
-            request.getRequestDispatcher("/WEB-INF/views/admin/admin-dashboard.jsp").forward(request, response);
-            
-            request.getRequestDispatcher("/WEB-INF/views/admin/admin-dashboard.jsp").forward(request, response);
+
+            // ── Election state for the controls panel ─────────────────────────
+            request.setAttribute("electionPhase",
+                    AppConfigUtil.getElectionPhase(getServletContext()).name());
+            request.setAttribute("positionReadiness", positionReadiness);
+            Object endTime = getServletContext().getAttribute("election.endTime"); // LocalDateTime
+            request.setAttribute("electionEndTime", endTime);
+
+            // ── CSRF token ────────────────────────────────────────────────────
+            request.setAttribute("csrfToken", CsrfUtil.getToken(request.getSession(true)));
+
+            // ── Single forward — do NOT call this twice ───────────────────────
+            request.getRequestDispatcher("/WEB-INF/views/admin/admin-dashboard.jsp")
+                    .forward(request, response);
+
         } finally {
             em.close();
         }

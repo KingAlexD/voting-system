@@ -9,6 +9,7 @@ import com.bascode.repository.AdminAuditLogRepository;
 import com.bascode.repository.ContesterRepository;
 import com.bascode.repository.UserRepository;
 import com.bascode.repository.VoteRepository;
+import com.bascode.util.AppConfigUtil;
 import com.bascode.util.ServletUtil;
 
 import jakarta.persistence.EntityManager;
@@ -26,24 +27,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-
 @WebServlet("/admin/election/control")
 public class ElectionControlServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
 
-    public static final String KEY_PHASE    = "election.phase";
-    public static final String KEY_END_TIME = "election.endTime";
+    /**
+     * Phase is stored via AppConfigUtil.setElectionPhase() which uses the
+     * ServletContext key "electionPhase". This is the SAME key that
+     * AppConfigUtil.getElectionPhase() and AppConfigUtil.isElectionOpen() read
+     * from — so VoteServlet's election gate now works correctly.
+     *
+     * The old bug was using a separate key "election.phase" that nothing else read.
+     */
     public static final String KEY_WINNER   = "election.winner";
+    public static final String KEY_END_TIME = "election.endTime"; // LocalDateTime or null
 
-    /** Minimum approved contesters per position to allow election start */
     private static final int MIN_PER_POSITION = 2;
-    /** Maximum approved contesters per position — no more applications after this */
-    public static final int MAX_PER_POSITION = 3;
 
-    private final UserRepository       userRepo       = new UserRepository();
-    private final ContesterRepository  contesterRepo  = new ContesterRepository();
-    private final VoteRepository       voteRepo       = new VoteRepository();
-    private final AdminAuditLogRepository auditRepo   = new AdminAuditLogRepository();
+    private final UserRepository          userRepo      = new UserRepository();
+    private final ContesterRepository     contesterRepo = new ContesterRepository();
+    private final VoteRepository          voteRepo      = new VoteRepository();
+    private final AdminAuditLogRepository auditRepo     = new AdminAuditLogRepository();
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res)
@@ -61,107 +65,121 @@ public class ElectionControlServlet extends HttpServlet {
             String action = req.getParameter("action");
             String errorMsg = null;
 
+            em.getTransaction().begin();
+
             switch (action == null ? "" : action) {
 
-               
+                // ── START ─────────────────────────────────────────────────────
                 case "start": {
                     List<Contester> approved = contesterRepo.findApproved(em);
 
                     Map<Position, Long> perPos = approved.stream()
-                            .collect(Collectors.groupingBy(Contester::getPosition, Collectors.counting())); if (perPos.isEmpty()) {
+                            .collect(Collectors.groupingBy(Contester::getPosition, Collectors.counting()));
+
+                    if (perPos.isEmpty()) {
                         errorMsg = "Cannot start: no approved contesters found. "
                                 + "Approve at least " + MIN_PER_POSITION + " per position.";
                         break;
                     }
-                    boolean tooFew = perPos.values().stream().anyMatch(c -> c < MIN_PER_POSITION);
-                    if (tooFew) {
-                        errorMsg = "Cannot start: every position must have at least "
+
+                    List<String> underStaffed = perPos.entrySet().stream()
+                            .filter(e -> e.getValue() < MIN_PER_POSITION)
+                            .map(e -> e.getKey().name() + " (" + e.getValue() + ")")
+                            .collect(Collectors.toList());
+
+                    if (!underStaffed.isEmpty()) {
+                        errorMsg = "Cannot start: every position needs at least "
                                 + MIN_PER_POSITION + " approved contesters. "
-                                + "Check: " + perPos.entrySet().stream()
-                                    .filter(e -> e.getValue() < MIN_PER_POSITION)
-                                    .map(e -> e.getKey() + " (" + e.getValue() + ")")
-                                    .collect(Collectors.joining(", "));
+                                + "Short: " + String.join(", ", underStaffed);
                         break;
                     }
 
-                    // Parse duration
                     long durationMinutes = parseLong(req.getParameter("durationMinutes"), 0L);
-                    durationMinutes = Math.max(0, Math.min(durationMinutes, 1440)); // cap at 24h
+                    durationMinutes = Math.max(0, Math.min(durationMinutes, 1440));
 
                     LocalDateTime endTime = durationMinutes > 0
                             ? LocalDateTime.now().plusMinutes(durationMinutes)
                             : null;
 
-                    getServletContext().setAttribute(KEY_PHASE,    ElectionPhase.OPEN);
+                    // Store phase where AppConfigUtil and VoteServlet can both read it
+                    AppConfigUtil.setElectionPhase(getServletContext(), ElectionPhase.OPEN);
                     getServletContext().setAttribute(KEY_END_TIME, endTime);
-                    getServletContext().setAttribute(KEY_WINNER,   null);
+                    getServletContext().setAttribute(KEY_WINNER, null);
 
                     String durStr = durationMinutes > 0 ? durationMinutes + " min" : "unlimited";
-                    logAudit(em, admin, "ELECTION_START",
+                    auditRepo.log(em, admin, "ELECTION_START",
                             "Election started. Duration: " + durStr
-                            + ". Approved positions: " + perPos.keySet());
+                            + ". Positions: " + perPos.keySet());
                     break;
                 }
 
-                /* ── PAUSE ──────────────────────────────────────────── */
+                // ── PAUSE ─────────────────────────────────────────────────────
                 case "pause": {
-                    getServletContext().setAttribute(KEY_PHASE, ElectionPhase.DRAFT);
-                    // Keep endTime so resume knows the original end
-                    logAudit(em, admin, "ELECTION_PAUSE", "Election paused by admin.");
+                    ElectionPhase current = AppConfigUtil.getElectionPhase(getServletContext());
+                    if (current != ElectionPhase.OPEN) {
+                        errorMsg = "Cannot pause: election is not currently OPEN.";
+                        break;
+                    }
+                    // DRAFT = paused state in your enum
+                    AppConfigUtil.setElectionPhase(getServletContext(), ElectionPhase.DRAFT);
+                    auditRepo.log(em, admin, "ELECTION_PAUSE", "Election paused by admin.");
                     break;
                 }
 
-                /* ── RESUME (re-open from pause) ────────────────────── */
+                // ── RESUME ────────────────────────────────────────────────────
                 case "resume": {
-                    getServletContext().setAttribute(KEY_PHASE, ElectionPhase.OPEN);
-                    logAudit(em, admin, "ELECTION_RESUME", "Election resumed by admin.");
+                    ElectionPhase current = AppConfigUtil.getElectionPhase(getServletContext());
+                    if (current != ElectionPhase.DRAFT) {
+                        errorMsg = "Cannot resume: election is not currently paused (DRAFT).";
+                        break;
+                    }
+                    AppConfigUtil.setElectionPhase(getServletContext(), ElectionPhase.OPEN);
+                    auditRepo.log(em, admin, "ELECTION_RESUME", "Election resumed by admin.");
                     break;
                 }
 
-                /* ── STOP ───────────────────────────────────────────── */
+                // ── STOP ──────────────────────────────────────────────────────
                 case "stop": {
                     List<Contester> approved = contesterRepo.findApproved(em);
                     Map<Long, Long> voteCounts = voteRepo.voteCountByContester(em);
-
 
                     Contester winner = approved.stream()
                             .max(Comparator.comparingLong(c -> voteCounts.getOrDefault(c.getId(), 0L)))
                             .orElse(null);
 
-                    getServletContext().setAttribute(KEY_PHASE,    ElectionPhase.CLOSED);
+                    AppConfigUtil.setElectionPhase(getServletContext(), ElectionPhase.CLOSED);
                     getServletContext().setAttribute(KEY_END_TIME, null);
 
                     if (winner != null) {
                         long wVotes = voteCounts.getOrDefault(winner.getId(), 0L);
-                        String wName = winner.getUser().getFirstName() + " " + winner.getUser().getLastName();
-                        String wPos = winner.getPosition().toString();
-
-                       
-                        String winnerJson = "{\"name\":\"" + escape(wName) + "\","
-                                + "\"position\":\"" + escape(wPos) + "\","
+                        String wName = winner.getUser().getFirstName() + " "
+                                + winner.getUser().getLastName();
+                        String wPos = winner.getPosition().name();
+                        String winnerJson = "{\"name\":\"" + esc(wName) + "\","
+                                + "\"position\":\"" + esc(wPos) + "\","
                                 + "\"votes\":" + wVotes + "}";
                         getServletContext().setAttribute(KEY_WINNER, winnerJson);
-
-                        logAudit(em, admin, "ELECTION_STOP",
-                                "Election stopped. Winner: " + wName + " (" + wPos + ") — " + wVotes + " votes.");
+                        auditRepo.log(em, admin, "ELECTION_STOP",
+                                "Stopped. Winner: " + wName + " (" + wPos + ") with "
+                                + wVotes + " vote(s).");
                     } else {
                         getServletContext().setAttribute(KEY_WINNER, null);
-                        logAudit(em, admin, "ELECTION_STOP", "Election stopped. No votes cast.");
+                        auditRepo.log(em, admin, "ELECTION_STOP",
+                                "Election stopped. No votes cast.");
                     }
                     break;
                 }
 
                 default:
-                    errorMsg = "Unknown election action: " + action;
+                    errorMsg = "Unknown action: " + action;
             }
 
             if (errorMsg != null) {
+                em.getTransaction().rollback();
                 req.getSession().setAttribute("error", errorMsg);
+            } else {
+                em.getTransaction().commit();
             }
-
-            // Commit audit log
-            if (!em.getTransaction().isActive()) em.getTransaction().begin();
-            em.getTransaction().commit();
 
         } catch (Exception ex) {
             if (em.getTransaction().isActive()) em.getTransaction().rollback();
@@ -173,21 +191,13 @@ public class ElectionControlServlet extends HttpServlet {
         res.sendRedirect(req.getContextPath() + "/admin/dashboard");
     }
 
-    /* ── Helpers ─────────────────────────────────────────────────────── */
     private long parseLong(String s, long def) {
         if (s == null || s.isBlank()) return def;
         try { return Long.parseLong(s.trim()); } catch (NumberFormatException e) { return def; }
     }
 
-    private String escape(String s) {
+    private String esc(String s) {
         if (s == null) return "";
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
-    }
-
-    private void logAudit(EntityManager em, User admin, String action, String detail) {
-        try {
-            if (!em.getTransaction().isActive()) em.getTransaction().begin();
-            auditRepo.log(em, admin, action, detail);
-        } catch (Exception ignored) {}
     }
 }
