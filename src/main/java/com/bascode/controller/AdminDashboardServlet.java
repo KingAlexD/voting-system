@@ -78,6 +78,7 @@ public class AdminDashboardServlet extends HttpServlet {
             PageResult<com.bascode.model.entity.AdminAuditLog> auditPage = PaginationUtil.paginate(auditLogs,
                     PaginationUtil.parsePage(request.getParameter("auditPage"), 1), 10);
 
+            
             long totalVotes = 0L;
             for (Long count : voteCounts.values()) totalVotes += count;
 
@@ -101,7 +102,10 @@ public class AdminDashboardServlet extends HttpServlet {
             request.setAttribute("votesTotalPages", votesPage.getTotalPages());
             request.setAttribute("auditPage", auditPage.getPage());
             request.setAttribute("auditTotalPages", auditPage.getTotalPages());
-
+         // Add this line BEFORE the forward (around line 120):
+            request.setAttribute("csrfToken", com.bascode.util.CsrfUtil.getToken(request.getSession(true)));
+            request.getRequestDispatcher("/WEB-INF/views/admin/admin-dashboard.jsp").forward(request, response);
+            
             request.getRequestDispatcher("/WEB-INF/views/admin/admin-dashboard.jsp").forward(request, response);
         } finally {
             em.close();

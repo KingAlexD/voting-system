@@ -2,11 +2,18 @@ package com.bascode.controller;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import jakarta.servlet.http.HttpSession;
+import com.bascode.util.CsrfUtil;
 
 import com.bascode.model.entity.Contester;
 import com.bascode.model.entity.User;
+import com.bascode.model.entity.Vote;
+import com.bascode.model.enums.Position;
 import com.bascode.repository.ContesterRepository;
 import com.bascode.repository.UserRepository;
 import com.bascode.repository.VoteRepository;
@@ -29,7 +36,9 @@ public class DashboardServlet extends HttpServlet {
     private final VoteRepository voteRepository = new VoteRepository();
 
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) 
+            throws ServletException, IOException {
+        
         EntityManagerFactory emf = ServletUtil.getEntityManagerFactory(getServletContext());
         EntityManager em = emf.createEntityManager();
         try {
@@ -40,18 +49,40 @@ public class DashboardServlet extends HttpServlet {
             }
 
             request.setAttribute("currentUser", currentUser);
-            request.setAttribute("approvedContesters", contesterRepository.findApproved(em));
+            List<Contester> approvedContesters = contesterRepository.findApproved(em);
+            request.setAttribute("approvedContesters", approvedContesters);
 
             Map<Long, Long> voteCounts = voteRepository.voteCountByContester(em);
             request.setAttribute("voteCounts", voteCounts);
 
-            boolean hasVoted = voteRepository.hasUserVoted(em, currentUser.getId());
-            request.setAttribute("hasVoted", hasVoted);
-
-           
-            if (hasVoted) {
-                request.setAttribute("myVote", voteRepository.findByVoterId(em, currentUser.getId()).orElse(null));
+            // **POSITION-SPECIFIC VOTING STATUS**
+            Map<Position, Boolean> userVotesByPosition = new HashMap<>();
+            Map<Position, Vote> userVotes = new HashMap<>();
+            boolean hasVotedAny = false;
+            
+            for (Position pos : Position.values()) {
+                Optional<Vote> vote = voteRepository.findByVoterIdAndPosition(em, currentUser.getId(), pos);
+                boolean hasVotedPos = vote.isPresent();
+                userVotesByPosition.put(pos, hasVotedPos);
+                if (hasVotedPos) {
+                    userVotes.put(pos, vote.get());
+                    hasVotedAny = true;
+                }
             }
+            
+            request.setAttribute("hasVoted", hasVotedAny);
+            request.setAttribute("userVotesByPosition", userVotesByPosition);
+            request.setAttribute("userVotes", userVotes);
+
+            // **CONTESTERS BY POSITION**
+            Map<Position, List<Contester>> contestersByPosition = new HashMap<>();
+            for (Position pos : Position.values()) {
+                List<Contester> positionContesters = approvedContesters.stream()
+                    .filter(c -> c.getPosition() == pos)
+                    .collect(Collectors.toList());
+                contestersByPosition.put(pos, positionContesters);
+            }
+            request.setAttribute("contestersByPosition", contestersByPosition);
 
             int age = LocalDate.now().getYear() - currentUser.getBirthYear();
             request.setAttribute("isAdult", age >= 18);
@@ -67,9 +98,11 @@ public class DashboardServlet extends HttpServlet {
 
             Optional<Contester> application = contesterRepository.findByUserId(em, currentUser.getId());
             request.setAttribute("myContesterApplication", application.orElse(null));
-            request.setAttribute("positions", com.bascode.model.enums.Position.values());
-
+            request.setAttribute("positions", Position.values());
+            HttpSession session = request.getSession(true);
+            request.setAttribute("csrfToken", CsrfUtil.getToken(session));
             request.getRequestDispatcher("/WEB-INF/views/voter/dashboard.jsp").forward(request, response);
+
         } finally {
             em.close();
         }

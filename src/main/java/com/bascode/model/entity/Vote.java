@@ -4,18 +4,13 @@ import com.bascode.model.enums.Position;
 import jakarta.persistence.*;
 
 @Entity
-@Table(
-    name = "votes",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"voter_id", "position"})
-)
+@Table(name = "votes", 
+       uniqueConstraints = @UniqueConstraint(columnNames = {"voter_id", "contester_position"}))
 public class Vote {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Use OneToOne if a user can only cast one vote total across the system
-    // Use ManyToOne if they can vote for multiple positions
     @ManyToOne 
     @JoinColumn(name = "voter_id", nullable = false)
     private User voter;
@@ -24,12 +19,15 @@ public class Vote {
     @JoinColumn(name = "contester_id")
     private Contester contester;
 
-    // FIX: Map the Enum as a String column, not a relationship
+    // **KEEP ONLY ONE - the @Column field**
     @Enumerated(EnumType.STRING)
-    @Column(name = "position", length = 50, nullable = false)
-    private Position position;
+    @Column(name = "contester_position", insertable = false, updatable = false)
+    private Position contesterPosition;
 
-    // --- Getters and Setters ---
+    // **REMOVE THIS DUPLICATE:**
+    // @Enumerated(EnumType.STRING)
+    // @Column(name = "contester_position", insertable = false, updatable = false)
+    // private Position contesterPosition;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -40,6 +38,12 @@ public class Vote {
     public Contester getContester() { return contester; }
     public void setContester(Contester contester) { this.contester = contester; }
 
-    public Position getPosition() { return position; }
-    public void setPosition(Position position) { this.position = position; }
+    public Position getContesterPosition() {
+        return contesterPosition != null ? contesterPosition : 
+               (contester != null ? contester.getPosition() : null);
+    }
+    
+    public void setContesterPosition(Position position) {
+        this.contesterPosition = position;
+    }
 }
