@@ -2,6 +2,7 @@ package com.bascode.controller;
 
 import com.bascode.model.entity.Contester;
 import com.bascode.model.entity.User;
+import com.bascode.model.enums.ContesterStatus;
 import com.bascode.model.enums.ElectionPhase;
 import com.bascode.model.enums.Position;
 import com.bascode.model.enums.Role;
@@ -22,6 +23,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -32,15 +34,19 @@ public class ElectionControlServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
 
     /**
-     * Phase is stored via AppConfigUtil.setElectionPhase() which uses the
-     * ServletContext key "electionPhase". This is the SAME key that
-     * AppConfigUtil.getElectionPhase() and AppConfigUtil.isElectionOpen() read
-     * from — so VoteServlet's election gate now works correctly.
+     * ServletContext attribute keys.
      *
-     * The old bug was using a separate key "election.phase" that nothing else read.
+     * KEY_WINNER  → JSON array of per-position winners, e.g.:
+     *   [{"name":"Alice","position":"PRESIDENT","votes":7},
+     *    {"name":"Bob","position":"VICE_PRESIDENT","votes":5}, ...]
+     *
+     * KEY_END_TIME → LocalDateTime when the election timer expires (or null = unlimited)
+     *
+     * Phase is stored via AppConfigUtil.setElectionPhase() under "electionPhase"
+     * so that AppConfigUtil.isElectionOpen() / getElectionPhase() both see it.
      */
-    public static final String KEY_WINNER   = "election.winner";
-    public static final String KEY_END_TIME = "election.endTime"; // LocalDateTime or null
+    public static final String KEY_WINNER   = "election.winner";   // JSON array String
+    public static final String KEY_END_TIME = "election.endTime";  // LocalDateTime or null
 
     private static final int MIN_PER_POSITION = 2;
 
@@ -101,7 +107,6 @@ public class ElectionControlServlet extends HttpServlet {
                             ? LocalDateTime.now().plusMinutes(durationMinutes)
                             : null;
 
-                    // Store phase where AppConfigUtil and VoteServlet can both read it
                     AppConfigUtil.setElectionPhase(getServletContext(), ElectionPhase.OPEN);
                     getServletContext().setAttribute(KEY_END_TIME, endTime);
                     getServletContext().setAttribute(KEY_WINNER, null);
@@ -120,7 +125,6 @@ public class ElectionControlServlet extends HttpServlet {
                         errorMsg = "Cannot pause: election is not currently OPEN.";
                         break;
                     }
-                    // DRAFT = paused state in your enum
                     AppConfigUtil.setElectionPhase(getServletContext(), ElectionPhase.DRAFT);
                     auditRepo.log(em, admin, "ELECTION_PAUSE", "Election paused by admin.");
                     break;
@@ -130,7 +134,7 @@ public class ElectionControlServlet extends HttpServlet {
                 case "resume": {
                     ElectionPhase current = AppConfigUtil.getElectionPhase(getServletContext());
                     if (current != ElectionPhase.DRAFT) {
-                        errorMsg = "Cannot resume: election is not currently paused (DRAFT).";
+                        errorMsg = "Cannot resume: election is not currently paused.";
                         break;
                     }
                     AppConfigUtil.setElectionPhase(getServletContext(), ElectionPhase.OPEN);
@@ -143,30 +147,41 @@ public class ElectionControlServlet extends HttpServlet {
                     List<Contester> approved = contesterRepo.findApproved(em);
                     Map<Long, Long> voteCounts = voteRepo.voteCountByContester(em);
 
-                    Contester winner = approved.stream()
-                            .max(Comparator.comparingLong(c -> voteCounts.getOrDefault(c.getId(), 0L)))
-                            .orElse(null);
+                    // Find the top vote-getter PER POSITION
+                    String winnersJson = buildWinnersJson(approved, voteCounts);
 
                     AppConfigUtil.setElectionPhase(getServletContext(), ElectionPhase.CLOSED);
                     getServletContext().setAttribute(KEY_END_TIME, null);
+                    getServletContext().setAttribute(KEY_WINNER, winnersJson);
 
-                    if (winner != null) {
-                        long wVotes = voteCounts.getOrDefault(winner.getId(), 0L);
-                        String wName = winner.getUser().getFirstName() + " "
-                                + winner.getUser().getLastName();
-                        String wPos = winner.getPosition().name();
-                        String winnerJson = "{\"name\":\"" + esc(wName) + "\","
-                                + "\"position\":\"" + esc(wPos) + "\","
-                                + "\"votes\":" + wVotes + "}";
-                        getServletContext().setAttribute(KEY_WINNER, winnerJson);
-                        auditRepo.log(em, admin, "ELECTION_STOP",
-                                "Stopped. Winner: " + wName + " (" + wPos + ") with "
-                                + wVotes + " vote(s).");
-                    } else {
-                        getServletContext().setAttribute(KEY_WINNER, null);
-                        auditRepo.log(em, admin, "ELECTION_STOP",
-                                "Election stopped. No votes cast.");
+                    auditRepo.log(em, admin, "ELECTION_STOP",
+                            "Election stopped. Winners: " + winnersJson);
+
+                    // ── Reset: demote all approved contesters back to VOTER
+                    //    and wipe their vote counts ──────────────────────────
+                    resetContestersToVoters(em, approved);
+
+                    break;
+                }
+
+                // ── RESET (admin manually prepares next election cycle) ────────
+                case "reset": {
+                    ElectionPhase current = AppConfigUtil.getElectionPhase(getServletContext());
+                    if (current != ElectionPhase.CLOSED) {
+                        errorMsg = "Can only reset after election is CLOSED.";
+                        break;
                     }
+
+                    List<Contester> allContesters = contesterRepo.findAll(em);
+                    resetContestersToVoters(em, allContesters);
+
+                    // Clear stored winner and move phase back to DRAFT ready for next cycle
+                    AppConfigUtil.setElectionPhase(getServletContext(), ElectionPhase.DRAFT);
+                    getServletContext().setAttribute(KEY_WINNER, null);
+                    getServletContext().setAttribute(KEY_END_TIME, null);
+
+                    auditRepo.log(em, admin, "ELECTION_RESET",
+                            "Election reset by admin. All contesters returned to voters.");
                     break;
                 }
 
@@ -191,13 +206,66 @@ public class ElectionControlServlet extends HttpServlet {
         res.sendRedirect(req.getContextPath() + "/admin/dashboard");
     }
 
+   
+    static String buildWinnersJson(List<Contester> approved, Map<Long, Long> voteCounts) {
+        // Group by position, find leader in each group
+        Map<Position, List<Contester>> byPosition = approved.stream()
+                .collect(Collectors.groupingBy(Contester::getPosition));
+
+        List<String> entries = new ArrayList<>();
+        for (Position pos : Position.values()) {
+            List<Contester> group = byPosition.get(pos);
+            if (group == null || group.isEmpty()) continue;
+
+            Contester leader = group.stream()
+                    .max(Comparator
+                            .comparingLong((Contester c) -> voteCounts.getOrDefault(c.getId(), 0L))
+                            .thenComparingLong(c -> -c.getId())) // tie-break: lower id wins
+                    .orElse(null);
+
+            if (leader == null) continue;
+
+            long votes = voteCounts.getOrDefault(leader.getId(), 0L);
+            String name = esc(leader.getUser().getFirstName() + " " + leader.getUser().getLastName());
+            entries.add("{\"name\":\"" + name + "\","
+                    + "\"position\":\"" + esc(pos.name()) + "\","
+                    + "\"votes\":" + votes + "}");
+        }
+
+        return "[" + String.join(",", entries) + "]";
+    }
+
+    /**
+     * Demotes every contester in the list back to VOTER role,
+     * marks their Contester record as DENIED (inactive),
+     * and deletes all votes cast for them.
+     * Must be called inside an active transaction.
+     */
+    private void resetContestersToVoters(EntityManager em, List<Contester> contesters) {
+        for (Contester c : contesters) {
+            // Delete all votes for this contester
+            voteRepo.deleteVotesByContesterId(em, c.getId());
+
+            // Downgrade role
+            User u = c.getUser();
+            if (u != null && u.getRole() == Role.CONTESTER) {
+                u.setRole(Role.VOTER);
+                userRepo.update(em, u);
+            }
+
+            // Mark contester record inactive so it won't show up as approved
+            c.setStatus(ContesterStatus.DENIED);
+            c.setRequestedPosition(null);
+            contesterRepo.update(em, c);
+        }
+    }
+
     private long parseLong(String s, long def) {
         if (s == null || s.isBlank()) return def;
         try { return Long.parseLong(s.trim()); } catch (NumberFormatException e) { return def; }
     }
 
-    private String esc(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    private static String esc(String s) {
+        return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }

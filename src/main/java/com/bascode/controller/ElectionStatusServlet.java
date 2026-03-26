@@ -1,6 +1,9 @@
 package com.bascode.controller;
 
+import com.bascode.model.entity.Contester;
 import com.bascode.model.enums.ElectionPhase;
+import com.bascode.repository.ContesterRepository;
+import com.bascode.repository.VoteRepository;
 import com.bascode.util.AppConfigUtil;
 import com.bascode.util.ServletUtil;
 
@@ -16,26 +19,35 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
 
 /**
  * GET /api/election-status
  *
- * Polled by winner-popup.js every 6 seconds from any page.
+ * Polled by winner-popup.js every 6 seconds from any page (logged-in or not).
  *
- * Response shape (matches what winner-popup.js expects):
+ * Response shape:
  * {
  *   "phase"      : "OPEN" | "DRAFT" | "CLOSED" | "RESULTS",
- *   "secondsLeft": 3600,        // present & >= 0 when OPEN with a timer, else null
- *   "winner"     : { "name":"...", "position":"...", "votes":12 }  // or null
+ *   "secondsLeft": 3600,   // >= 0 when OPEN with a timer, else null
+ *   "winner"     : [       // array — one entry per position — or null
+ *     { "name":"Alice Smith", "position":"PRESIDENT",     "votes": 7 },
+ *     { "name":"Bob Jones",   "position":"VICE_PRESIDENT","votes": 4 },
+ *     ...
+ *   ]
  * }
  *
- * Also handles auto-close: if phase is OPEN and the endTime has passed,
- * this endpoint transitions the phase to CLOSED and computes the winner
- * (same logic as the Stop action in ElectionControlServlet).
+ * When the timer expires this endpoint auto-closes the election, computes
+ * per-position winners, resets all contesters back to voters, and caches
+ * the result so subsequent polls are cheap.
  */
 @WebServlet("/api/election-status")
 public class ElectionStatusServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
+
+    private final ContesterRepository contesterRepo = new ContesterRepository();
+    private final VoteRepository      voteRepo      = new VoteRepository();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -52,6 +64,7 @@ public class ElectionStatusServlet extends HttpServlet {
         // ── Auto-close when timer expires ─────────────────────────────────────
         if (phase == ElectionPhase.OPEN && endTime != null
                 && LocalDateTime.now().isAfter(endTime)) {
+
             synchronized (this) {
                 // Re-check inside lock to prevent double-close from concurrent requests
                 phase = AppConfigUtil.getElectionPhase(ctx);
@@ -59,74 +72,79 @@ public class ElectionStatusServlet extends HttpServlet {
                     AppConfigUtil.setElectionPhase(ctx, ElectionPhase.CLOSED);
                     ctx.setAttribute(ElectionControlServlet.KEY_END_TIME, null);
                     phase = ElectionPhase.CLOSED;
-                    // Compute winner if not already set
+
+                    // Compute winners and reset contesters to voters in one DB call
                     if (ctx.getAttribute(ElectionControlServlet.KEY_WINNER) == null) {
-                        computeAndCacheWinner(ctx);
+                        computeWinnersAndReset(ctx);
                     }
                 }
             }
         }
 
-        // ── Build seconds remaining ───────────────────────────────────────────
+        // ── Seconds remaining ─────────────────────────────────────────────────
         Long secondsLeft = null;
         if (phase == ElectionPhase.OPEN && endTime != null) {
             long s = ChronoUnit.SECONDS.between(LocalDateTime.now(), endTime);
-            secondsLeft = Math.max(0, s);
+            secondsLeft = Math.max(0L, s);
         }
 
-        // ── Get winner JSON ───────────────────────────────────────────────────
+        // ── Winner JSON (already a JSON array string, or "null") ──────────────
         Object winnerRaw = ctx.getAttribute(ElectionControlServlet.KEY_WINNER);
-        String winnerJson = (winnerRaw instanceof String) ? (String) winnerRaw : "null";
+        // winnerRaw is the raw JSON array string built by ElectionControlServlet
+        String winnerJson = (winnerRaw instanceof String && !((String) winnerRaw).isBlank())
+                ? (String) winnerRaw
+                : "null";
 
-        // ── Assemble response ─────────────────────────────────────────────────
-        StringBuilder json = new StringBuilder("{");
-        json.append("\"phase\":\"").append(phase.name()).append("\"");
-        json.append(",\"secondsLeft\":").append(secondsLeft != null ? secondsLeft : "null");
-        json.append(",\"winner\":").append(winnerJson);
-        json.append("}");
+        // ── Build response ────────────────────────────────────────────────────
+        String json = "{"
+                + "\"phase\":\"" + phase.name() + "\","
+                + "\"secondsLeft\":" + (secondsLeft != null ? secondsLeft : "null") + ","
+                + "\"winner\":" + winnerJson
+                + "}";
 
-        response.getWriter().write(json.toString());
+        response.getWriter().write(json);
     }
 
     /**
-     * Finds the approved contester with the most votes and stores their
-     * data as a JSON string in ServletContext under KEY_WINNER.
+     * Computes per-position winners, caches the JSON in ServletContext,
+     * then demotes all approved contesters back to voters and wipes vote counts.
+     * Called only once — inside the synchronized block above.
      */
-    private void computeAndCacheWinner(ServletContext ctx) {
+    private void computeWinnersAndReset(ServletContext ctx) {
         EntityManagerFactory emf = ServletUtil.getEntityManagerFactory(ctx);
         if (emf == null) return;
+
         EntityManager em = emf.createEntityManager();
         try {
-            com.bascode.repository.ContesterRepository contesterRepo =
-                    new com.bascode.repository.ContesterRepository();
-            com.bascode.repository.VoteRepository voteRepo =
-                    new com.bascode.repository.VoteRepository();
+            List<Contester> approved = contesterRepo.findApproved(em);
+            Map<Long, Long> voteCounts = voteRepo.voteCountByContester(em);
 
-            java.util.List<com.bascode.model.entity.Contester> approved =
-                    contesterRepo.findApproved(em);
-            java.util.Map<Long, Long> voteCounts = voteRepo.voteCountByContester(em);
+            // Build and cache the winners JSON array
+            String winnersJson = ElectionControlServlet.buildWinnersJson(approved, voteCounts);
+            ctx.setAttribute(ElectionControlServlet.KEY_WINNER, winnersJson);
 
-            com.bascode.model.entity.Contester winner = approved.stream()
-                    .max(java.util.Comparator.comparingLong(
-                            c -> voteCounts.getOrDefault(c.getId(), 0L)))
-                    .orElse(null);
+            // Reset all contesters → voters inside a transaction
+            em.getTransaction().begin();
+            for (Contester c : approved) {
+                voteRepo.deleteVotesByContesterId(em, c.getId());
 
-            if (winner != null) {
-                long wVotes = voteCounts.getOrDefault(winner.getId(), 0L);
-                String wName = winner.getUser().getFirstName() + " "
-                        + winner.getUser().getLastName();
-                String wPos = winner.getPosition().name();
-                String json = "{\"name\":\"" + esc(wName) + "\","
-                        + "\"position\":\"" + esc(wPos) + "\","
-                        + "\"votes\":" + wVotes + "}";
-                ctx.setAttribute(ElectionControlServlet.KEY_WINNER, json);
+                com.bascode.model.entity.User u = c.getUser();
+                if (u != null && u.getRole() == com.bascode.model.enums.Role.CONTESTER) {
+                    u.setRole(com.bascode.model.enums.Role.VOTER);
+                    em.merge(u);
+                }
+
+                c.setStatus(com.bascode.model.enums.ContesterStatus.DENIED);
+                c.setRequestedPosition(null);
+                em.merge(c);
             }
+            em.getTransaction().commit();
+
+        } catch (Exception ex) {
+            if (em.getTransaction().isActive()) em.getTransaction().rollback();
+            ex.printStackTrace();
         } finally {
             em.close();
         }
-    }
-
-    private String esc(String s) {
-        return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }
