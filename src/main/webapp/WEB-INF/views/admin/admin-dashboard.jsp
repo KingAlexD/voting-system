@@ -70,26 +70,47 @@
     &#9889; Election Controls
     <span id="phaseBadge" class="election-ctrl__phase phase-draft">Loading…</span>
   </div>
-  
-  <div id="electionStatusMsg" style="display:none; margin-bottom:16px;"></div>
-  
+
+  <%-- Session error (e.g. not enough contestants) --%>
+  <c:if test="${not empty sessionScope.error}">
+    <div class="vo-alert vo-alert--error" style="margin-bottom:16px;">${sessionScope.error}</div>
+    <c:remove var="error" scope="session"/>
+  </c:if>
+
+  <%-- Per-position readiness badges --%>
+  <c:if test="${not empty positionReadiness}">
+    <div style="margin-bottom:16px;">
+      <p style="font-family:'Syne',sans-serif;font-size:.6rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:rgba(234,228,214,.3);margin-bottom:8px;">
+        Approved per position (need &ge;2 to start)
+      </p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <c:forEach items="${positionReadiness}" var="entry">
+          <span class="vo-badge ${entry.value >= 2 ? 'vo-badge--green' : 'vo-badge--coral'}">
+            ${entry.key}: ${entry.value}
+          </span>
+        </c:forEach>
+      </div>
+    </div>
+  </c:if>
+
   <div class="election-ctrl__row">
-    <!-- START ELECTION -->
-    <form id="startForm" action="${pageContext.request.contextPath}/admin/election/control" method="POST" style="display:contents;">
+
+    <%-- START (only shown when DRAFT) --%>
+    <form action="${pageContext.request.contextPath}/admin/election/control" method="POST" style="display:contents;">
       <input type="hidden" name="_csrf" value="${csrfToken}">
       <input type="hidden" name="action" value="start">
       <div class="dur-field">
         <label>Duration (1–1440 min)</label>
-        <input type="number" name="durationMinutes" min="1" max="1440" placeholder="Unlimited if blank" 
-               style="width:140px;">
+        <input type="number" name="durationMinutes" min="1" max="1440" placeholder="Unlimited if blank" style="width:140px;">
       </div>
-      <button type="submit" class="vo-btn vo-btn--gold" id="btnStart">
+      <button type="submit" class="vo-btn vo-btn--gold"
+              onclick="return confirm('Start the election? Make sure all positions have ≥2 approved contestants.')">
         &#9654; Start Election
       </button>
     </form>
 
-    <!-- PAUSE/RESUME -->
-    <form id="pauseForm" action="${pageContext.request.contextPath}/admin/election/control" method="POST" style="display:contents;">
+    <%-- PAUSE / RESUME (toggled by JS based on phase) --%>
+    <form action="${pageContext.request.contextPath}/admin/election/control" method="POST" style="display:contents;">
       <input type="hidden" name="_csrf" value="${csrfToken}">
       <input type="hidden" name="action" id="pauseAction" value="pause">
       <button type="submit" class="vo-btn vo-btn--ghost" id="btnPause">
@@ -97,16 +118,36 @@
       </button>
     </form>
 
-    <!-- STOP & DECLARE -->
-    <form id="stopForm" action="${pageContext.request.contextPath}/admin/election/control" method="POST" style="display:contents;">
+    <%-- STOP & DECLARE --%>
+    <form action="${pageContext.request.contextPath}/admin/election/control" method="POST" style="display:contents;">
       <input type="hidden" name="_csrf" value="${csrfToken}">
       <input type="hidden" name="action" value="stop">
-      <button type="submit" class="vo-btn vo-btn--danger-ghost" id="btnStop"
-              onclick="return confirm('🛑 Stop election and declare winner?\n\nThis is PERMANENT and cannot be undone.\nAll voting stops immediately.');">
-        &#9632; Stop & Declare
+      <button type="submit" class="vo-btn vo-btn--danger-ghost"
+              onclick="return confirm('🛑 Stop election and declare winners?\n\nThis is PERMANENT. All voting stops and contestants are reset to voters.');">
+        &#9632; Stop &amp; Declare
       </button>
     </form>
+
+    <%-- RESET (only shown after CLOSED — prepares next cycle) --%>
+    <form action="${pageContext.request.contextPath}/admin/election/control" method="POST" style="display:contents;">
+      <input type="hidden" name="_csrf" value="${csrfToken}">
+      <input type="hidden" name="action" value="reset">
+      <button type="submit" class="vo-btn vo-btn--ghost" id="btnReset" style="display:none;"
+              onclick="return confirm('Reset for a new election cycle? All remaining contester records will be cleared.')">
+        &#8635; Reset for Next Election
+      </button>
+    </form>
+
   </div>
+
+  <div id="timerDisplay" style="margin-top:12px;"></div>
+
+  <p class="ctrl-hint">
+    <strong>Start:</strong> Requires &ge;2 approved contestants per position.<br>
+    
+    <strong>Reset:</strong> Available after CLOSED — clears records so the next election can begin.
+  </p>
+</div>
   
   <div id="timerDisplay" style="margin-top:12px;"></div>
   
@@ -377,14 +418,14 @@
   var CTX = '${pageContext.request.contextPath}';
 
   /* ── Contester modal ─────────────────────────────────── */
-  function openCModal(name,email,pos,status,manifesto,birth,state) {
-    document.getElementById('cmName').textContent     = name;
-    document.getElementById('cmEmail').textContent    = email;
-    document.getElementById('cmPos').textContent      = pos;
-    document.getElementById('cmStatus').textContent   = status;
+ function openCModal(name, email, pos, status, manifesto, birth, state) {
+    document.getElementById('cmName').textContent      = name;
+    document.getElementById('cmEmail').textContent     = email;
+    document.getElementById('cmPos').textContent       = pos;
+    document.getElementById('cmStatus').textContent    = status;
     document.getElementById('cmManifesto').textContent = manifesto || 'No manifesto provided.';
-    document.getElementById('cmBirth').textContent    = birth;
-    document.getElementById('cmState').textContent    = state;
+    document.getElementById('cmBirth').textContent     = birth;
+    document.getElementById('cmState').textContent     = state;
     document.getElementById('cModal').classList.add('open');
     document.body.style.overflow = 'hidden';
   }
@@ -392,72 +433,143 @@
     document.getElementById('cModal').classList.remove('open');
     document.body.style.overflow = '';
   }
-  document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closeCModal(); } });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeCModal(); });
 
-  /* ── Election status + timer ─────────────────────────── */
+  /* ── Election status poll + timer ────────────────────────────────────── */
   var _winnerShown = false;
+
   function pollElection() {
     fetch(CTX + '/api/election-status')
-      .then(function(r){ return r.ok ? r.json() : null; })
-      .then(function(d){ if(d) applyElectionStatus(d); })
-      .catch(function(){});
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) applyElectionStatus(d); })
+      .catch(function () {});
   }
+
   function applyElectionStatus(d) {
+    /* ── Phase badge ── */
     var badge = document.getElementById('phaseBadge');
-    var cls = d.phase === 'OPEN' ? 'phase-open' : (d.phase === 'CLOSED' || d.phase === 'RESULTS' ? 'phase-closed' : 'phase-draft');
+    var cls = d.phase === 'OPEN'
+      ? 'phase-open'
+      : (d.phase === 'CLOSED' || d.phase === 'RESULTS' ? 'phase-closed' : 'phase-draft');
     badge.className = 'election-ctrl__phase ' + cls;
     badge.textContent = d.phase;
 
+    /* ── Timer display ── */
     var timerEl = document.getElementById('timerDisplay');
-    if (d.secondsLeft !== null && d.secondsLeft >= 0 && d.phase === 'OPEN') {
+    if (d.secondsLeft !== null && d.secondsLeft !== undefined && d.secondsLeft >= 0 && d.phase === 'OPEN') {
       var s = d.secondsLeft;
-      timerEl.textContent = '⏱ ' + Math.floor(s/3600) + 'h ' + Math.floor((s%3600)/60) + 'm ' + (s%60) + 's remaining';
-    } else { timerEl.textContent = ''; }
+      timerEl.textContent = '⏱ '
+        + Math.floor(s / 3600) + 'h '
+        + Math.floor((s % 3600) / 60) + 'm '
+        + (s % 60) + 's remaining';
+    } else {
+      timerEl.textContent = '';
+    }
 
-    // Pause/Resume
-    var btn = document.getElementById('btnPause');
-    var act = document.getElementById('pauseAction');
-    if (d.phase === 'DRAFT') { btn.textContent = '▶ Resume'; act.value = 'resume'; }
-    else { btn.innerHTML = '&#9646;&#9646;&nbsp; Pause'; act.value = 'pause'; }
+    /* ── Pause / Resume button ── */
+    var btnPause = document.getElementById('btnPause');
+    var actInput = document.getElementById('pauseAction');
+    if (btnPause && actInput) {
+      if (d.phase === 'DRAFT') {
+        btnPause.innerHTML = '&#9654;&nbsp; Resume';
+        actInput.value = 'resume';
+        btnPause.style.display = '';
+      } else if (d.phase === 'OPEN') {
+        btnPause.innerHTML = '&#9646;&#9646;&nbsp; Pause';
+        actInput.value = 'pause';
+        btnPause.style.display = '';
+      } else {
+        btnPause.style.display = 'none';
+      }
+    }
 
-    // Winner popup
+    /* ── Reset button (only visible when CLOSED) ── */
+    var btnReset = document.getElementById('btnReset');
+    if (btnReset) {
+      btnReset.style.display = d.phase === 'CLOSED' ? '' : 'none';
+    }
+
+    /* ── Winner popup (array of per-position winners) ── */
     if (d.phase === 'CLOSED' && d.winner && !_winnerShown) {
       _winnerShown = true;
-      showWinnerPopup(d.winner);
+      // winner-popup.js handles both array and single-object shapes
+      if (typeof showWinnerPopup === 'function') {
+        showWinnerPopup(d.winner);
+      }
     }
-  }
-  pollElection(); setInterval(pollElection, 5000);
 
-  /* ── Live results ─────────────────────────────────────── */
-  (function(){
+    /* Reset flag when a new election starts */
+    if (d.phase === 'OPEN') _winnerShown = false;
+  }
+
+  pollElection();
+  setInterval(pollElection, 5000);
+
+  /* ── Live results chart ──────────────────────────────────────────────── */
+  (function () {
     function render(data) {
       var body = document.getElementById('liveResultsBody');
-      if (!data||!data.labels||!data.labels.length) { body.innerHTML='<p style="text-align:center;padding:24px;color:rgba(234,228,214,.3);font-family:\'Syne\',sans-serif;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;">No votes yet.</p>'; return; }
-      var pos={};
-      for(var i=0;i<data.labels.length;i++){
-        var p=data.labels[i].split(' ('); var n=p[0]; var pn=(p[1]||'General').replace(')','');
-        var v=data.votes[i]||0;
-        if(!pos[pn])pos[pn]=[];
-        pos[pn].push({name:n,votes:v});
+      if (!data || !data.labels || !data.labels.length) {
+        body.innerHTML = '<p style="text-align:center;padding:24px;color:rgba(234,228,214,.3);'
+          + 'font-family:\'Syne\',sans-serif;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;">No votes yet.</p>';
+        return;
       }
-      Object.keys(pos).forEach(function(p){pos[p].sort(function(a,b){return b.votes-a.votes;});});
-      var mx=Math.max.apply(null,data.votes.concat([1]));
-      var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">';
-      Object.keys(pos).forEach(function(pn){
-        html+='<div><div class="results-position-label">'+pn+'</div>';
-        pos[pn].forEach(function(c,i){
-          var pct=Math.round((c.votes/mx)*100);var lead=i===0&&c.votes>0;
-          html+='<div class="result-card '+(lead?'result-card--leader':'')+'"><div class="result-card__bar" style="width:'+pct+'%"></div><div class="result-card__rank">'+(i+1)+'</div><div class="result-card__info"><div class="result-card__name">'+c.name+'</div></div><div class="result-card__votes"><div class="result-card__num">'+c.votes+'</div><span class="result-card__vword">'+(c.votes===1?'vote':'votes')+'</span></div></div>';
-        });
-        html+='</div>';
+
+      /* Group by position */
+      var pos = {};
+      for (var i = 0; i < data.labels.length; i++) {
+        var p  = data.labels[i].split(' (');
+        var n  = p[0];
+        var pn = (p[1] || 'General').replace(')', '');
+        var v  = data.votes[i] || 0;
+        if (!pos[pn]) pos[pn] = [];
+        pos[pn].push({ name: n, votes: v });
+      }
+      Object.keys(pos).forEach(function (p) {
+        pos[p].sort(function (a, b) { return b.votes - a.votes; });
       });
-      html+='</div>';
-      body.innerHTML=html;
-      setTimeout(function(){body.querySelectorAll('.result-card__bar').forEach(function(b){var w=b.style.width;b.style.width='0';setTimeout(function(){b.style.width=w;},50);});},10);
+
+      var mx   = Math.max.apply(null, data.votes.concat([1]));
+      var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">';
+
+      Object.keys(pos).forEach(function (pn) {
+        html += '<div><div class="results-position-label">' + pn + '</div>';
+        pos[pn].forEach(function (c, i) {
+          var pct  = Math.round((c.votes / mx) * 100);
+          var lead = i === 0 && c.votes > 0;
+          html += '<div class="result-card ' + (lead ? 'result-card--leader' : '') + '">'
+            + '<div class="result-card__bar" style="width:' + pct + '%"></div>'
+            + '<div class="result-card__rank">' + (i + 1) + '</div>'
+            + '<div class="result-card__info"><div class="result-card__name">' + c.name + '</div></div>'
+            + '<div class="result-card__votes"><div class="result-card__num">' + c.votes + '</div>'
+            + '<span class="result-card__vword">' + (c.votes === 1 ? 'vote' : 'votes') + '</span></div>'
+            + '</div>';
+        });
+        html += '</div>';
+      });
+      html += '</div>';
+
+      body.innerHTML = html;
+      setTimeout(function () {
+        body.querySelectorAll('.result-card__bar').forEach(function (b) {
+          var w = b.style.width;
+          b.style.width = '0';
+          setTimeout(function () { b.style.width = w; }, 50);
+        });
+      }, 10);
     }
-    function go(){ fetch(CTX+'/api/vote-stats').then(function(r){return r.ok?r.json():null;}).then(function(d){if(d)render(d);}).catch(function(){}); }
-    go(); setInterval(go,8000);
+
+    function go() {
+      fetch(CTX + '/api/vote-stats')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) { if (d) render(d); })
+        .catch(function () {});
+    }
+
+    go();
+    setInterval(go, 8000);
   })();
+
   </script>
 
 </body>
